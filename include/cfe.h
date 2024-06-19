@@ -17,7 +17,7 @@
 
 // t-shirt approximation of the hydrologic routing funtionality of the National Water Model v 1.2, 2.0, and 2.1
 // This code was developed to test the hypothesis that the National Water Model runoff generation, vadose zone
-// dynamics, and conceptual groundwater model can be greatly simplified by acknowledging that it is truly a 
+// dynamics, and conceptual groundwater model can be greatly simplified by acknowledging that it is truly a
 // conceptual model.  The hypothesis is supported by a number of observations made during a 2017-2018 deep dive
 // into the NWM code.  Thesed are:
 //
@@ -26,7 +26,7 @@
 //    function by Moore, 1985.   The Schaake function is a single valued function of soil moisture deficit,
 //    predicts 100% runoff when the soil is saturated, like the curve-number method, and is fundamentally simple.
 // 2. Run-on infiltration is strictly not calculated.  Overland flow routing applies the Schaake function repeatedly
-//    to predict this phenomenon, which violates the underlying assumption of the PDM method that only rainfall 
+//    to predict this phenomenon, which violates the underlying assumption of the PDM method that only rainfall
 //    inputs affect soil moisture.
 // 3. The water-content based Richards' equation, applied using a coarse-discretization, can be replaced with a simple
 //    conceptual reservoir because it never allows saturation or infiltration-excess runoff unless deactivated by
@@ -99,8 +99,9 @@ typedef struct evapotranspiration_structure evapotranspiration_structure;
 struct massbal
 {
     double volstart            ;
-    double vol_runoff          ;   
-    double vol_infilt          ;   
+    double vol_runoff          ;
+    double vol_infilt          ;
+    double vol_runon_infilt    ;
     double vol_out_surface     ;
     double vol_end_surface     ;
     double vol_to_gw           ;
@@ -116,8 +117,8 @@ struct massbal
     double vol_soil_to_gw      ;  // this should equal vol_to_gw
     double vol_soil_end        ;
     double vol_et_from_soil    ;
-    double vol_et_from_rain    ; 
-    double vol_et_to_atm       ;   
+    double vol_et_from_rain    ;
+    double vol_et_to_atm       ;
     double volin               ;
     double volout              ;
     double volend              ;
@@ -131,8 +132,8 @@ typedef enum {Schaake=1, Xinanjiang=2} surface_water_partition_type;
 typedef enum {GIUH=1, NASH_CASCADE=2} surface_runoff_scheme;
 
 /* xinanjiang_dev*/
-struct direct_runoff_parameters_structure{
-    surface_water_partition_type surface_partitioning_scheme;
+struct infiltration_excess_parameters_structure {
+    surface_water_partition_type surface_water_partitioning_scheme;
     double Schaake_adjusted_magic_constant_by_soil_type;
     double a_Xinanjiang_inflection_point_parameter;
     double b_Xinanjiang_shape_parameter;
@@ -140,20 +141,20 @@ struct direct_runoff_parameters_structure{
     double urban_decimal_fraction;
     double ice_content_threshold; // ice content above which soil is impermeable
 };
-typedef struct direct_runoff_parameters_structure direct_runoff_parameters_structure;
+typedef struct infiltration_excess_parameters_structure infiltration_excess_parameters_structure;
 
 
 // function prototypes
 // --------------------------------
 extern void Schaake_partitioning_scheme(double dt, double field_capacity_m, double magic_number, double deficit, double qinsur,
-					double smcmax, double soil_depth, double *runsrf, double *pddum, double ice_fraction_schaake,
-					double ice_content_threshold);
+                                        double smcmax, double soil_depth, double *runsrf, double *pddum, double ice_fraction_schaake,
+                                        double ice_content_threshold);
 
-// xinanjiang_dev: XinJiang function written by Rachel adapted by Jmframe and FLO, 
+// xinanjiang_dev: XinJiang function written by Rachel adapted by Jmframe and FLO,
 extern void Xinanjiang_partitioning_scheme(double water_input_depth_m, double field_capacity_m,
-					   double max_soil_moisture_storage_m, double column_total_soil_water_m,
-					   struct direct_runoff_parameters_structure *parms, double *surface_runoff_depth_m,
-					   double *infiltration_depth_m, double ice_fraction_xinanjiang);
+                                           double max_soil_moisture_storage_m, double column_total_soil_water_m,
+                                           struct infiltration_excess_parameters_structure *parms, double *infiltration_excess_m,
+                                           double *infiltration_depth_m, double ice_fraction_xinanjiang);
 
 extern void et_from_rainfall(double *timestep_rainfall_input_m, struct evapotranspiration_structure *et_struct);
 
@@ -167,19 +168,13 @@ extern void cfe(
         struct NWM_soil_parameters NWM_soil_params_struct,
         struct conceptual_reservoir *soil_reservoir_struct,
         double timestep_h,
-
-        /* xinanjiang_dev: since we are doing the option for Schaake and XinJiang, 
+        /* xinanjiang_dev: since we are doing the option for Schaake and XinJiang,
                            instead of passing in the constants
                            pass in a structure with the constants for both subroutines.
         //double Schaake_adjusted_magic_constant_by_soil_type,*/
-        struct direct_runoff_parameters_structure direct_runoff_param_struct,
-
+        struct infiltration_excess_parameters_structure infiltration_excess_params_struct,
         double timestep_rainfall_input_m,
-
-        /* xinanjiang_dev:
-        double *Schaake_output_runoff_m_ptr,*/
-        double *flux_output_direct_runoff_m,
-
+        double *infiltration_excess_m_ptr,
         double *infiltration_depth_m_ptr,
         double *flux_perc_m_ptr,
         double *flux_lat_m_ptr,
@@ -194,12 +189,12 @@ extern void cfe(
         int num_lateral_flow_nash_reservoirs,
         double K_nash,
         double *nash_storage_arr,
-	struct nash_cascade_parameters *nash_surface_params,
+        struct nash_cascade_parameters *nash_surface_params,
         struct evapotranspiration_structure *evap_struct,
         double *Qout_m_ptr,
         struct massbal *massbal_struct,
         double time_step_size,
-	int surface_runoff_scheme
+        int surface_runoff_scheme
     );
 
 #endif //CFE_CFE_H
