@@ -4,6 +4,25 @@
 #include "bmi.h"
 #include "bmi_cfe.h"
 #include "cfe.h"
+#include "logger.h"
+
+void setup_logger(void) {
+    Logger* logger = GetInstance();
+
+    Log(logger, "Sample Log for LogLevel::ERROR", ERROR, NGEN);
+    Log(logger, "Sample Log for LogLevel::FATAL", FATAL, NGEN);
+    Log(logger, "Sample Log for LogLevel::WARN", WARN, NGEN);
+    Log(logger, "Sample Log for LogLevel::INFO", INFO, NGEN);
+    
+    const char* multiline_log = 
+        "First line of multiline log:\n"
+        "   Indented second line of multiline log\n"
+        "         Indented third line of multiline log\n"
+        "                Indented fourth line of multiline log";
+    Log(logger, multiline_log, INFO, NGEN);
+    
+    Log(logger, "Sample Log for LogLevel::DEBUG", DEBUG, NGEN);
+}
 
 /*
 This main program is a mock framwork.
@@ -12,6 +31,8 @@ This is not part of BMI, but acts as the driver that calls the model.
 int
  main(int argc, const char *argv[])
 {
+  // setup the logger
+  setup_logger();
   
   ////////////////////////////////////////////////////////////////
   //////////////    USING UPDATE    //////////////////////////////
