@@ -3079,7 +3079,8 @@ extern void initialize_volume_trackers(cfe_state_struct* cfe_ptr){
     cfe_ptr->vol_struct.vol_out_giuh = 0;
     cfe_ptr->vol_struct.vol_in_nash = 0;
     cfe_ptr->vol_struct.vol_out_nash = 0;
-    cfe_ptr->vol_struct.volstart       += cfe_ptr->gw_reservoir.storage_m;    // initial mass balance checks in g.w. reservoir
+    //cfe_ptr->vol_struct.volstart       += cfe_ptr->gw_reservoir.storage_m;    // initial mass balance checks in g.w. reservoir
+    cfe_ptr->vol_struct.volstart       = cfe_ptr->gw_reservoir.storage_m;    // YLiu: initial mass balance checks in g.w. reservoir
     cfe_ptr->vol_struct.vol_in_gw_start = cfe_ptr->gw_reservoir.storage_m;  
     cfe_ptr->vol_struct.volstart          += cfe_ptr->soil_reservoir.storage_m;    // initial mass balance checks in soil reservoir
     cfe_ptr->vol_struct.vol_soil_start     = cfe_ptr->soil_reservoir.storage_m;
