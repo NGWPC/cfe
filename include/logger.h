@@ -60,5 +60,6 @@ void SetLogPreferences(Logger* logger, LogLevel level);
 void Log(Logger* logger, const char* message, LogLevel messageLevel, LoggingModule module);
 LogLevel GetLogLevel(const char* logLevel);
 char* createTimestamp();
+void setup_logger(void);
 
 #endif

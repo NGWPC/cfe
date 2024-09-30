@@ -5,6 +5,8 @@
 #include "bmi_cfe.h"
 #include <time.h>
 #include <float.h>
+#include "logger.h"
+
 #ifndef WATER_SPECIFIC_WEIGHT
 #define WATER_SPECIFIC_WEIGHT 9810
 #define STANDARD_ATMOSPHERIC_PRESSURE_PASCALS 101325
@@ -1290,6 +1292,10 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 
 static int Initialize (Bmi *self, const char *file)
 {
+    // setup the logger
+    setup_logger();
+    printf("In CFE Initialize()");
+    
     //FIXME, we can use the input file to help imply "framework" support or "standalone"
     //an empty init file string indicates things will come from set_value???
     //what happens when both occur, that is we have a config file and framewrok

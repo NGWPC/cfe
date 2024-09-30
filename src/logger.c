@@ -82,3 +82,20 @@ LogLevel GetLogLevel(const char* logLevel) {
     return NONE;
 }
 
+void setup_logger(void) {
+    Logger* logger = GetInstance();
+
+    Log(logger, "Sample Log for LogLevel::ERROR", ERROR, CFE);
+    Log(logger, "Sample Log for LogLevel::FATAL", FATAL, CFE);
+    Log(logger, "Sample Log for LogLevel::WARN", WARN, CFE);
+    Log(logger, "Sample Log for LogLevel::INFO", INFO, CFE);
+    
+    const char* multiline_log = 
+        "First line of multiline log:\n"
+        "   Indented second line of multiline log\n"
+        "         Indented third line of multiline log\n"
+        "                Indented fourth line of multiline log";
+    Log(logger, multiline_log, INFO, CFE);
+    
+    Log(logger, "Sample Log for LogLevel::DEBUG", DEBUG, CFE);
+}
