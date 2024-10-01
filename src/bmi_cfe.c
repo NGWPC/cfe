@@ -1294,8 +1294,9 @@ static int Initialize (Bmi *self, const char *file)
 {
     // setup the logger
     setup_logger();
-    printf("In CFE Initialize()");
-    
+    Logger* logger = GetInstance();
+    Log(logger, "In CFE Initialize()\n", INFO);   
+
     //FIXME, we can use the input file to help imply "framework" support or "standalone"
     //an empty init file string indicates things will come from set_value???
     //what happens when both occur, that is we have a config file and framewrok
@@ -1474,6 +1475,7 @@ static int Initialize (Bmi *self, const char *file)
 #if CFE_DEBUG > 0
     printf("At declaration of smc_profile size, soil_reservoir.n_soil_layers = %i\n", cfe_bmi_data_ptr->soil_reservoir.n_soil_layers);
 #endif
+    Log(logger, "Success in CFE BMI Initialization\n", INFO);   
 
     return BMI_SUCCESS;
 }

@@ -8,9 +8,9 @@
 
 typedef enum {      
     NONE = 0,
-    FATAL,
     DEBUG,
     INFO,
+    FATAL,
     WARN,
     ERROR,
 } LogLevel;
@@ -57,7 +57,7 @@ typedef struct {
 
 Logger* GetInstance();
 void SetLogPreferences(Logger* logger, LogLevel level);
-void Log(Logger* logger, const char* message, LogLevel messageLevel, LoggingModule module);
+void Log(Logger* logger, const char* message, LogLevel messageLevel);
 LogLevel GetLogLevel(const char* logLevel);
 char* createTimestamp();
 void setup_logger(void);
