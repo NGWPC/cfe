@@ -1,6 +1,6 @@
 [submodule "extern/aorc_bmi"]
 	path = extern/aorc_bmi
-	url = https://gitlab.sh.nextgenwaterprediction.com/NGWPC/nwm-ngen/aorc_bmi.git
+	url = https://github.com/NOAA-OWP/aorc_bmi.git
 [submodule "extern/evapotranspiration"]
 	path = extern/evapotranspiration
-	url = https://gitlab.sh.nextgenwaterprediction.com/NGWPC/nwm-ngen/evapotranspiration.git
+	url = https://github.com/NOAA-OWP/evapotranspiration.git

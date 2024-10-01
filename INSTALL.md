@@ -80,9 +80,9 @@ See general instructions [here](https://github.com/NOAA-OWP/ngen/wiki/NGen-Tutor
      - cmake -B cmake_build -S . -DBMI_C_LIB_ACTIVE=ON -DBMI_FORTRAN_ACTIVE=ON -DNGEN_ACTIVATE_PYTHON=ON
      - make -j4 -C cmake_build
   - #### CFE
-    - git submodule update --remote extern/cfe/cfe
-    - cmake -B extern/cfe/cfe/cmake_build -S extern/cfe/cfe/ -DNGEN=ON
-    - make -C extern/cfe/cfe/cmake_build
+    - git submodule update --remote extern/cfe/cfe 
+    - cmake -B extern/cfe/cmake_build -S extern/cfe/cfe/ -DNGEN=ON
+    - make -C extern/cfe/cmake_build
   - #### SLoTH
     SLoTH is also needed to run SFT in the ngen framework. SLoTH is a BMI that is used to set a bmi variable(s) that is not provided by other BMIs but required by the model. So build [SLoTH](https://github.com/NOAA-OWP/SLoTH) using the following instructions
     - cd extern/sloth/ && git checkout latest 
@@ -103,7 +103,7 @@ The following pre-process step needs to be completed before running the example.
   **Note:** Make sure the "library_file" and "init_config" in the BMI blocks in the realization file are pointing to the right files, these paths depend on how you build your models.
 
   ```
-  Run: ../cmake_build/ngen data/catchment_data.geojson cat-27 data/nexus_data.geojson nex-26 realizations/realization_cfe_pet_surfgiuh.json
+  Run: ../cmake_build/ngen data/catchment_data.geojson cat-27 data/nexus_data.geojson nex-26 realizations/realization_cfe_pet.json
   ```
 
 ## Alternative: Compiling and Running CFE

@@ -7,6 +7,9 @@ set(Red         "${Esc}[32m")
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_C_COMPILER $ENV{CC})
+set(CMAKE_CXX_COMPILER $ENV{CXX})
+
 # module setup options
 
 option(BASE "BASE" OFF)
@@ -43,6 +46,7 @@ endif()
 # set the project name
 project(cfebmi VERSION 1.0.0 DESCRIPTION "OWP CFE BMI Module Shared Library")
 
+set(CMAKE_BUILD_TYPE Debug)
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
     message("Debug build.")
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -51,33 +55,31 @@ message(CMAKE_CXX_COMPILER " ${CMAKE_CXX_COMPILER}")
 message(CMAKE_C_COMPILER " ${CMAKE_C_COMPILER}")
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+
 # add the executable
 
 ## cfe + aorc + pet + smp
 if(AETROOTZONE)
-add_executable(${exe_name} ./src/main_cfe_aorc_pet_rz_aet.cxx ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/logger.c
-			   ./src/conceptual_reservoir.c ./src/nash_cascade.c ./extern/aorc_bmi/src/aorc.c
-			   ./extern/aorc_bmi/src/bmi_aorc.c ./extern/evapotranspiration/src/pet.c
+add_executable(${exe_name} ./src/main_cfe_aorc_pet_rz_aet.cxx ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/conceptual_reservoir.c
+    			   ./extern/aorc_bmi/src/aorc.c ./extern/aorc_bmi/src/bmi_aorc.c ./extern/evapotranspiration/src/pet.c
 			   ./extern/evapotranspiration/src/bmi_pet.c)
 
-add_library(cfelib ./extern/SoilMoistureProfiles/src/bmi_soil_moisture_profile.cxx
-		   ./extern/SoilMoistureProfiles/src/soil_moisture_profile.cxx
-                   ./extern/SoilMoistureProfiles/include/bmi_soil_moisture_profile.hxx
-		   ./extern/SoilMoistureProfiles/include/soil_moisture_profile.hxx)
+add_library(cfelib ./extern/SoilMoistureProfiles/src/bmi_soil_moisture_profile.cxx ./extern/SoilMoistureProfiles/src/soil_moisture_profile.cxx
+                   ./extern/SoilMoistureProfiles/include/bmi_soil_moisture_profile.hxx ./extern/SoilMoistureProfiles/include/soil_moisture_profile.hxx)
 target_link_libraries(${exe_name} LINK_PUBLIC cfelib)
 elseif(FORCING)
-add_executable(${exe_name} ./src/main_pass_forcings.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/logger.c ./src/conceptual_reservoir.c
-			   ./src/nash_cascade.c ./extern/aorc_bmi/src/aorc.c ./extern/aorc_bmi/src/bmi_aorc.c)
+add_executable(${exe_name} ./src/main_pass_forcings.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/conceptual_reservoir.c
+			   ./extern/aorc_bmi/src/aorc.c ./extern/aorc_bmi/src/bmi_aorc.c)
 elseif(FORCINGPET)
-add_executable(${exe_name} ./src/main_cfe_aorc_pet.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/logger.c ./src/conceptual_reservoir.c
-			   ./src/nash_cascade.c ./extern/aorc_bmi/src/aorc.c ./extern/aorc_bmi/src/bmi_aorc.c
-			   ./extern/evapotranspiration/src/pet.c ./extern/evapotranspiration/src/bmi_pet.c)
+add_executable(${exe_name} ./src/main_cfe_aorc_pet.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/conceptual_reservoir.c
+			   ./extern/aorc_bmi/src/aorc.c ./extern/aorc_bmi/src/bmi_aorc.c ./extern/evapotranspiration/src/pet.c
+			   ./extern/evapotranspiration/src/bmi_pet.c)
 elseif(BASE)
-add_executable(${exe_name} ./src/main.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/logger.c ./src/conceptual_reservoir.c
-			   ./src/nash_cascade.c)
+add_executable(${exe_name} ./src/main.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/conceptual_reservoir.c)
 elseif(UNITTEST)
-add_executable(${exe_name} ./test/main_unit_test.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/logger.c ./src/conceptual_reservoir.c
-			   ./src/nash_cascade.c)
+add_executable(${exe_name} ./test/main_unit_test.c ./src/cfe.c ./src/bmi_cfe.c ./src/giuh.c ./src/conceptual_reservoir.c)
 endif()
 
 
@@ -96,9 +98,9 @@ set(CFE_LIB_DESC_CMAKE "OWP CFE BMI Module Shared Library")
 add_compile_definitions(BMI_ACTIVE)
 
 if(WIN32)
-    add_library(cfebmi ./src/bmi_cfe.c ./src/cfe.c ./src/giuh.c ./src/logger.c ./src/conceptual_reservoir.c ./src/nash_cascade.c)
+    add_library(cfebmi ./src/bmi_cfe.c ./src/cfe.c ./src/giuh.c ./src/conceptual_reservoir.c)
 else()
-    add_library(cfebmi SHARED ./src/bmi_cfe.c ./src/cfe.c ./src/giuh.c ./src/logger.c ./src/conceptual_reservoir.c ./src/nash_cascade.c)
+    add_library(cfebmi SHARED ./src/bmi_cfe.c ./src/cfe.c ./src/giuh.c ./src/conceptual_reservoir.c)
 endif()
 
 target_include_directories(cfebmi PRIVATE include)
