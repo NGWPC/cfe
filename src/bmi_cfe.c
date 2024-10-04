@@ -5,6 +5,8 @@
 #include "bmi_cfe.h"
 #include <time.h>
 #include <float.h>
+#include "logger.h"
+
 #ifndef WATER_SPECIFIC_WEIGHT
 #define WATER_SPECIFIC_WEIGHT 9810
 #define STANDARD_ATMOSPHERIC_PRESSURE_PASCALS 101325
@@ -1140,6 +1142,11 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 
 static int Initialize (Bmi *self, const char *file)
 {
+    // setup the logger
+    setup_logger();
+    Logger* logger = GetInstance();
+    Log(logger, "In CFE Initialize()\n", INFO);     
+
     //FIXME, we can use the input file to help imply "framework" support or "standalone"
     //an empty init file string indicates things will come from set_value???
     //what happens when both occur, that is we have a config file and framewrok
@@ -1319,6 +1326,7 @@ static int Initialize (Bmi *self, const char *file)
 #if CFE_DEBUG > 0
     printf("At declaration of smc_profile size, soil_reservoir.n_soil_layers = %i\n", cfe_bmi_data_ptr->soil_reservoir.n_soil_layers);
 #endif
+    Log(logger, "Success in CFE BMI Initialization\n", INFO);
 
     return BMI_SUCCESS;
 }
