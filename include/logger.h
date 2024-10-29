@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdarg.h> // for variable args: va_list
 
 typedef enum {      
     NONE = 0,
@@ -56,8 +57,8 @@ typedef struct {
 } Logger;
 
 Logger* GetInstance();
-void SetLogPreferences(Logger* logger, LogLevel level);
-void Log(Logger* logger, const char* message, LogLevel messageLevel);
+void SetLogPreferences(Logger* logger);
+void Log(LogLevel messageLevel, const char* message, ...);
 LogLevel GetLogLevel(const char* logLevel);
 char* createTimestamp();
 void setup_logger(void);
