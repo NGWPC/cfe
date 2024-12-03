@@ -48,13 +48,13 @@ void SetLogPreferences(Logger* logger) {
 
     logger->logFile = fopen(log_file_path, "a");
     if (logger->logFile == NULL) {
-        printf("Can't Open Log File\n");
+        printf("Can't Open Log File for CFE\n");
         // create local log directory and file
         const char* logFileDir = "./run_logs/ngen_";
         char fullPath[256];
         snprintf(fullPath, sizeof(fullPath), "%s%s/", logFileDir, createTimestamp());
 
-        printf("Log File Directory: %s\n", fullPath);
+        printf("CFE Log File Directory: %s\n", fullPath);
 
         char mkdir_cmd[512];
         snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", fullPath);
@@ -62,21 +62,21 @@ void SetLogPreferences(Logger* logger) {
         if (status == -1) {
             fprintf(stderr, "Error: %s\n", strerror(errno));
         } else {
-            printf("Directories are created\n");
+            printf("Directories are created for CFE\n");
         }
 
         char logFilePath[512];
         snprintf(logFilePath, sizeof(logFilePath), "%scfe_log.txt", fullPath);
         logger->logFile = fopen(logFilePath, "w");
         if (logger->logFile == NULL) {
-            fprintf(stderr, "Can't Open local Log File\n");
+            fprintf(stderr, "Can't Open local Log File for CFE\n");
         }
         else {
-            printf("Log File Path: %s\n", logFilePath);
+            printf("CFE Log File Path: %s\n", logFilePath);
         }
     }
     else {
-        printf("Log File Path: %s\n", log_file_path);
+        printf("CFE Log File Path: %s\n", log_file_path);
     }
 }
 
