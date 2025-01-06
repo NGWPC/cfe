@@ -36,11 +36,15 @@ char* createTimestamp() {
 }
 
 void SetLogPreferences(Logger* logger) {
-#ifdef LOG_LEVEL    
-    logger->logLevel = LOG_LEVEL;
-#else 
-    logger->logLevel = INFO;
-#endif
+    // get the log level for CFE module
+    char * logLevel = getenv("cfe_ll");
+    if (strlen(logLevel) != 0) {
+        logger->logLevel = GetLogLevel(logLevel);
+    }
+    else {
+        logger->logLevel = INFO;
+    }
+    printf("CFE module's log level is set at: %s\n", logLevel);
 
 	// get the log file path
 	char * log_file_path;
@@ -88,6 +92,20 @@ Logger* GetInstance() {
     return loggerInstance;
 }
 
+const char* getLogLevelString(LogLevel level) {
+    const char* logType;
+    switch (level) {
+        case FATAL: logType = "FATAL "; break;
+        case DEBUG: logType = "DEBUG "; break;
+        case INFO:  logType = "INFO  "; break;
+        case WARN:  logType = "WARN  "; break;
+        case ERROR: logType = "ERROR "; break;
+        default:    logType = "NONE  "; break;
+    }
+
+    return logType;
+}
+
 void Log(LogLevel messageLevel, const char* message, ...) {
     Logger* logger = GetInstance();
     va_list arglist;
@@ -99,19 +117,9 @@ void Log(LogLevel messageLevel, const char* message, ...) {
     va_end(arglist);
 
     if (messageLevel >= logger->logLevel) {
-        const char* logType;
-        switch (messageLevel) {
-            case FATAL: logType = "FATAL "; break;
-            case DEBUG: logType = "DEBUG "; break;
-            case INFO:  logType = "INFO  "; break;
-            case WARN:  logType = "WARN  "; break;
-            case ERROR: logType = "ERROR "; break;
-            default:    logType = "NONE  "; break;
-        }
-
         char final_message[1024];
         snprintf(final_message, sizeof(final_message), "%s %s %s%s\n", 
-                 createTimestamp(), module_name[CFE], logType, buffer);
+                 createTimestamp(), module_name[CFE], getLogLevelString(messageLevel), buffer);
         
         if (logger->logFile != NULL) {
             fprintf(logger->logFile, "%s", final_message);
@@ -129,21 +137,4 @@ LogLevel GetLogLevel(const char* logLevel) {
     if (strcmp(logLevel, "ERROR") == 0) return ERROR;
     if (strcmp(logLevel, "FATAL") == 0) return ERROR;
     return NONE;
-}
-
-void setup_logger() {
-    LogLevel level = ERROR;
-    Log(ERROR, "Sample Log for LogLevel::%d", level);
-    Log(FATAL, "Sample Log for LogLevel::FATAL");
-    Log(WARN, "Sample Log for LogLevel::WARN");
-    Log(INFO, "Sample Log for LogLevel::INFO");
-    
-    const char* multiline_log = 
-        "First line of multiline log:\n"
-        "   Indented second line of multiline log\n"
-        "         Indented third line of multiline log\n"
-        "                Indented fourth line of multiline log";
-    Log(INFO, multiline_log);
-    
-    Log(DEBUG, "Sample Log for LogLevel::DEBUG");
 }
