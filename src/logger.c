@@ -38,7 +38,7 @@ char* createTimestamp() {
 void SetLogPreferences(Logger* logger) {
     // get the log level for CFE module
     char * logLevel = getenv("cfe_ll");
-    if (logLevel != NULL) {
+    if (strlen(logLevel) != 0) {
         logger->logLevel = GetLogLevel(logLevel);
     }
     else {
