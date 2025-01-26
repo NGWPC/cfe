@@ -1,4 +1,5 @@
 #include "cfe.h"
+#include "logger.h"
 
 #define max(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b);  _a > _b ? _a : _b; })
 #define min(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b);  _a < _b ? _a : _b; })
@@ -131,8 +132,8 @@ extern void cfe(
       }
     else
       {
-      fprintf(stderr,"Problem, must specify one of Schaake of Xinanjiang partitioning scheme.\n");
-      fprintf(stderr,"Program terminating.\n");
+      Log(FATAL, "Problem, must specify one of Schaake of Xinanjiang partitioning scheme.\n");
+      Log(FATAL, "Program terminating.\n");
       exit(-1);   // note -1 is arbitrary   #############BOMB################ NEW FLO
       }
     }
@@ -158,10 +159,10 @@ extern void cfe(
     
 #ifdef DEBUG
   /* xinanjiang_dev
-  printf("After Schaake function: rain:%8.5lf mm  runoff:%8.5lf mm  infiltration:%8.5lf mm  residual:%e m\n",
+  Log(DEBUG, "After Schaake function: rain:%8.5lf mm  runoff:%8.5lf mm  infiltration:%8.5lf mm  residual:%e m\n",
                                  timestep_rainfall_input_m,Schaake_output_runoff_m*1000.0,infiltration_depth_m*1000.0,
                                  timestep_rainfall_input_m-Schaake_output_runoff_m-infiltration_depth_m);                   */
-  printf("After direct runoff function: rain:%8.5lf mm  runoff:%8.5lf mm  infiltration:%8.5lf mm  residual:%e m\n",
+  Log(DEBUG, "After direct runoff function: rain:%8.5lf mm  runoff:%8.5lf mm  infiltration:%8.5lf mm  residual:%e m\n",
                                  timestep_rainfall_input_m,direct_output_runoff_m*1000.0,infiltration_depth_m*1000.0,
                                  timestep_rainfall_input_m-direct_output_runoff_m-infiltration_depth_m);
 #endif  
@@ -230,13 +231,13 @@ extern void cfe(
   if(flux_from_deep_gw_to_chan_m >  gw_reservoir_struct->storage_m)  {
   flux_from_deep_gw_to_chan_m=gw_reservoir_struct->storage_m;
   // TODO: set a flag when flux larger than storage
-  printf("WARNING: Groundwater flux larger than storage \n");
+  Log(WARN, "WARNING: Groundwater flux larger than storage \n");
   }
  
   massbal_struct->vol_from_gw+=flux_from_deep_gw_to_chan_m;
   
   // in the instance of calling the gw reservoir the secondary flux should be zero- verify
-  if(is_fabs_less_than_epsilon(secondary_flux,1.0e-09)==FALSE) printf("problem with nonzero flux point 1\n");
+  if(is_fabs_less_than_epsilon(secondary_flux,1.0e-09)==FALSE) Log(ERROR, "problem with nonzero flux point 1\n");
 
   
   // adjust state of deep groundwater conceptual nonlinear reservoir

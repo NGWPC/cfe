@@ -12,8 +12,6 @@
 #define STANDARD_ATMOSPHERIC_PRESSURE_PASCALS 101325
 #endif
 
-#define CFE_DEBUG 1
-
 #define INPUT_VAR_NAME_COUNT 5
 #define OUTPUT_VAR_NAME_COUNT 13
 
@@ -380,9 +378,8 @@ static int Get_time_units (Bmi *self, char * units)
 static int Get_current_time (Bmi *self, double * time)
 {
     Get_start_time(self, time);
-#if CFE_DEBUG > 1
-    printf("Current model time step: '%d'\n", ((cfe_state_struct *) self->data)->current_time_step);
-#endif
+    Log(DEBUG, "Current model time step: '%d'\n", ((cfe_state_struct *) self->data)->current_time_step);
+
     *time += (((cfe_state_struct *) self->data)->current_time_step * ((cfe_state_struct *) self->data)->time_step_size);
     return BMI_SUCCESS;
 }
@@ -411,12 +408,11 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     // Note that this determines max line length including the ending return character, if present
     int count_result = read_file_line_counts_cfe(config_file, &config_line_count, &max_config_line_length);
     if (count_result == -1) {
-        printf("Invalid config file '%s'", config_file);
+        Log(ERROR, "Invalid config file '%s'", config_file);
         return BMI_FAILURE;
     }
-#if CFE_DEBUG >= 1
-    printf("Config file details - Line Count: %d | Max Line Length %d\n", config_line_count, max_config_line_length);
-#endif
+
+    Log(DEBUG, "Config file details - Line Count: %d | Max Line Length %d\n", config_line_count, max_config_line_length);
 
     FILE* fp = fopen(config_file, "r");
     if (fp == NULL)
@@ -514,9 +510,9 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         char *param_key, *param_value, *param_units;
         if (fgets(config_line, max_config_line_length + 1, fp) == NULL)
             return BMI_FAILURE;
-#if CFE_DEBUG >= 3
-        printf("Line value: ['%s']\n", config_line);
-#endif
+        
+        Log(DEBUG, "Line value: ['%s']\n", config_line);
+
         char* config_line_ptr = config_line;
         config_line_ptr = strsep(&config_line_ptr, "\n");
         param_key = strsep(&config_line_ptr, "=");
@@ -524,9 +520,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         param_value = strsep(&config_line_ptr, "[");
         param_units = strsep(&config_line_ptr, "]");
 
-#if CFE_DEBUG >= 1
-        printf("Config Value - Param: '%s' | Value: '%s' | Units: '%s'\n", param_key, param_value, param_units);
-#endif
+        Log(DEBUG, "Config Value - Param: '%s' | Value: '%s' | Units: '%s'\n", param_key, param_value, param_units);
 
         if (strcmp(param_key, "forcing_file") == 0) {
             model->forcing_file = strdup(param_value);
@@ -542,9 +536,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__depth_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log(WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -558,9 +550,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__satdk_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log(WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -569,9 +559,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__satpsi_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log(WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -580,9 +568,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__slop_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -591,9 +577,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__smcmax_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -602,9 +586,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__wltsmc_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -623,9 +605,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_gw_max_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             // Also set the true storage if storage was already read and was a ratio, and so we were waiting for this
 /*            if (is_gw_storage_set == TRUE && is_gw_storage_ratio == TRUE) {
@@ -638,9 +618,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_Cgw_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -655,9 +633,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_gw_storage_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
 /*            char* trailing_chars;
             gw_storage_literal = strtod(param_value, &trailing_chars);
@@ -689,9 +665,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_storage_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-                printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+                Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -715,9 +689,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             continue;
         }
         if (strcmp(param_key, "giuh_ordinates") == 0) {
-#if CFE_DEBUG >= 1
-            printf("Found configured GIUH ordinate values ('%s')\n", param_value);
-#endif
+            Log(DEBUG, "Found configured GIUH ordinate values ('%s')\n", param_value);
             giuh_originates_string_val = strdup(param_value);
             is_giuh_originates_string_val_set = TRUE;
             continue;
@@ -744,9 +716,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 
 	if (is_aet_rootzone_set == TRUE) {
 	  if (strcmp(param_key, "soil_layer_depths") == 0) {
-#if CFE_DEBUG >= 1   
-            printf("Found configured soil depth values ('%s')\n", param_value);
-#endif
+            Log(DEBUG, "Found configured soil depth values ('%s')\n", param_value);
             soil_layer_depths_string_val = strdup(param_value);
             is_soil_layer_depths_string_val_set = TRUE;
             continue;
@@ -803,188 +773,134 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 	    is_ice_content_threshold_set = TRUE;
 	     // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-#if CFE_DEBUG >= 1            
-	      printf ("WARNING: [units] expected for '%s' in config file \n", param_key);
-#endif
+    	      Log( WARN, "[units] expected for '%s' in config file \n", param_key);
             }
 	  }
 	}
     }
 
     if (is_forcing_file_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'forcing_file' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'forcing_file' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__depth_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.depth' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.depth' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__bb_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.bb' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.bb' not found in config file\n");
         return BMI_FAILURE;
     }
 
     if (is_soil_params__satdk_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.satdk' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.satdk' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__satpsi_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.satpsi' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.satpsi' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__slop_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.slop' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.slop' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__smcmax_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.smcmax' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.smcmax' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__wltsmc_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.wltsmc' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.wltsmc' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__expon_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.expon' not found in config file, defaulting to 1 (linear)\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.expon' not found in config file, defaulting to 1 (linear)\n");
         model->soil_reservoir.exponent_primary = 1.0;
         //is_soil_params__expon_set == TRUE;
         // Don't return BMI_FAILURE, this is a optional config
         //return BMI_FAILURE;
     }
     if (is_soil_params__expon2_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_params.expon_secondary' not found in config file, defaulting to 1 (linear)\n");
-#endif
+        Log(ERROR, "Config param 'soil_params.expon_secondary' not found in config file, defaulting to 1 (linear)\n");
         model->soil_reservoir.exponent_secondary = 1.0;
         // Don't return BMI_FAILURE, this is a optional config
         //return BMI_FAILURE;
     }
     if (is_Cgw_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'Cgw' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'Cgw' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_expon_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'expon' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'expon' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_alpha_fc_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'alpha_fc' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'alpha_fc' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_soil_storage_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'soil_storage' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'soil_storage' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_K_nash_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'K_nash' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'K_nash' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_K_lf_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'K_lf' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'K_lf' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_gw_max_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'max_gw_storage' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'max_gw_storage' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_gw_storage_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'gw_storage' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'gw_storage' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_num_timesteps_set == FALSE && strcmp(model->forcing_file, "BMI")) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'num_timesteps' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'num_timesteps' not found in config file\n");
         return BMI_FAILURE;
     }
     if (is_verbosity_set == FALSE) {
-        printf("Config param 'verbosity' not found in config file\n");
-        printf("setting verbosity to a high value\n");
+        Log(ERROR, "Config param 'verbosity' not found in config file\n");
+        Log(ERROR, "setting verbosity to a high value\n");
         model->verbosity = 10;
         return BMI_FAILURE;
     }
     if (is_direct_runoff_method_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'direct_runoff_method' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'direct_runoff_method' not found in config file\n");
         return BMI_FAILURE;
     }
 /* xinanjiang_dev*/
     if(model->direct_runoff_params_struct.surface_partitioning_scheme == Xinanjiang){
         if (is_a_Xinanjiang_inflection_point_parameter_set == FALSE) {
-#if CFE_DEBUG >= 1
-            printf("Config param 'a_Xinanjiang_inflection_point_parameter' not found in config file\n");
-#endif
+            Log(ERROR, "Config param 'a_Xinanjiang_inflection_point_parameter' not found in config file\n");
             return BMI_FAILURE;
         }
         if (is_b_Xinanjiang_shape_parameter_set == FALSE) {
-#if CFE_DEBUG >= 1
-            printf("Config param 'b_Xinanjiang_shape_parameter' not found in config file\n");
-#endif
+            Log(ERROR, "Config param 'b_Xinanjiang_shape_parameter' not found in config file\n");
             return BMI_FAILURE;
         }
         if (is_x_Xinanjiang_shape_parameter_set == FALSE) {
-#if CFE_DEBUG >= 1
-            printf("Config param 'x_Xinanjiang_shape_parameter' not found in config file\n");
-#endif
+            Log(ERROR, "Config param 'x_Xinanjiang_shape_parameter' not found in config file\n");
             return BMI_FAILURE;
         }
-	if (is_urban_decimal_fraction_set == FALSE) {
-#if CFE_DEBUG >= 1
-	  printf("Config param 'urban_decimal_fraction' not found in config file\n");
-#endif
-	  return BMI_FAILURE;
-	}  
+	    if (is_urban_decimal_fraction_set == FALSE) {
+	    Log(ERROR, "Config param 'urban_decimal_fraction' not found in config file\n");
+	    return BMI_FAILURE;
+	    }  
     }
 
     if(model->direct_runoff_params_struct.surface_partitioning_scheme == Schaake){
         model->direct_runoff_params_struct.Schaake_adjusted_magic_constant_by_soil_type = model->NWM_soil_params.refkdt * model->NWM_soil_params.satdk / 0.000002;   
-#if CFE_DEBUG >= 1
-    printf("Schaake Magic Constant calculated\n");
-#endif
+        Log(INFO, "Schaake Magic Constant calculated\n");
     }
     
     if (is_sft_coupled_set == TRUE && model->direct_runoff_params_struct.surface_partitioning_scheme == Schaake) {
 
       if(!is_ice_content_threshold_set) {
-#if CFE_DEBUG >= 1
-	printf("is_sft_coupled and Schaake scheme are set to TRUE but param 'ice_fraction_threshold' not found in config file\n");
-	exit(-9);
-#endif
+	    Log(FATAL, "is_sft_coupled and Schaake scheme are set to TRUE but param 'ice_fraction_threshold' not found in config file\n");
+	    exit(-9);
       }
 
     }
@@ -998,31 +914,23 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     /*------------------- Root zone AET development -rlm----------------------------- */
     if (is_aet_rootzone_set == TRUE ) {
       if (is_max_rootzone_layer_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Config param 'max_rootzone_layer' not found in config file\n");
-#endif
+        Log(ERROR, "Config param 'max_rootzone_layer' not found in config file\n");
         return BMI_FAILURE;
       }
       if (is_soil_layer_depths_string_val_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("Soil layer depths string/values not set!\n");
-#endif
+        Log(ERROR, "Soil layer depths string/values not set!\n");
         return BMI_FAILURE;
       }
 
-#if CFE_DEBUG >=1
-      printf("Soil layer depths string values found in config ('%d')\n", is_soil_layer_depths_string_val_set);
-#endif
+      Log(INFO, "Soil layer depths string values found in config ('%d')\n", is_soil_layer_depths_string_val_set);
 
       model->soil_reservoir.n_soil_layers = lround(count_delimited_values(soil_layer_depths_string_val, ","));
-      printf("n_soil_layers set in bmi_cfe.c: %d\n", model->soil_reservoir.n_soil_layers);
+      Log(INFO, "n_soil_layers set in bmi_cfe.c: %d\n", model->soil_reservoir.n_soil_layers);
 
-#if CFE_DEBUG >= 1
-      printf("Counted number of soil depths (%d)\n", model->soil_reservoir.n_soil_layers);
-#endif
+      Log(INFO, "Counted number of soil depths (%d)\n", model->soil_reservoir.n_soil_layers);
 
       if (model->soil_reservoir.n_soil_layers < 1)
-	return BMI_FAILURE;
+    	return BMI_FAILURE;
 
       model->soil_reservoir.soil_layer_depths_m = malloc(sizeof(double) * (model->soil_reservoir.n_soil_layers + 1));
       copy = soil_layer_depths_string_val;
@@ -1037,7 +945,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
       //Check that the last depth read in from the cfe config file (soil_layer_depths) matches the total depth (soil_params.depth)
       //from the cfe config file.
       if(model->NWM_soil_params.D != model->soil_reservoir.soil_layer_depths_m[model->soil_reservoir.n_soil_layers]){
-        printf("WARNING: soil_params.depth is not equal to the last soil layer depth in the CFE config file!\n");
+        Log(WARN, "soil_params.depth is not equal to the last soil layer depth in the CFE config file!\n");
         return BMI_FAILURE;
       }
 
@@ -1052,7 +960,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
       for (int i=1; i <= model->soil_reservoir.n_soil_layers; i++) {
         current_depth = model->soil_reservoir.soil_layer_depths_m[i];
         if (current_depth <= previous_depth)
-	  printf("WARNING: soil depths may be out of order.  One or more soil layer depths is less than or equal to the previous layer. Check CFE config file.\n");
+	        Log(WARN, "Soil depths may be out of order.  One or more soil layer depths is less than or equal to the previous layer. Check CFE config file.\n");
         model->soil_reservoir.delta_soil_layer_depth_m[i] = current_depth - previous_depth;
         previous_depth = current_depth;
       }
@@ -1069,24 +977,16 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 
     /*--------------------END OF ROOT ZONE ADJUSTED AET DEVELOPMENT -rlm ------------------------------*/
      
-#if CFE_DEBUG >= 1
-    printf("All CFE config params present\n");
-#endif    
+    Log(INFO, "All CFE config params present\n");
 
     // Handle GIUH ordinates, bailing if they were not provided
     if (is_giuh_originates_string_val_set == FALSE) {
-#if CFE_DEBUG >= 1
-        printf("GIUH ordinate string not set!\n");
-#endif
+        Log(ERROR, "GIUH ordinate string not set!\n");
         return BMI_FAILURE;
     }
-#if CFE_DEBUG >= 1
-    printf("GIUH ordinates string value found in config ('%s')\n", giuh_originates_string_val);
-#endif
+    Log(INFO, "GIUH ordinates string value found in config ('%s')\n", giuh_originates_string_val);
     model->num_giuh_ordinates = count_delimited_values(giuh_originates_string_val, ",");
-#if CFE_DEBUG >= 1
-    printf("Counted number of GIUH ordinates (%d)\n", model->num_giuh_ordinates);
-#endif
+    Log(INFO, "Counted number of GIUH ordinates (%d)\n", model->num_giuh_ordinates);
     if (model->num_giuh_ordinates < 1)
         return BMI_FAILURE;
 
@@ -1132,9 +1032,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             model->nash_storage[j] = 0.0;
     }
     fclose(fp);
-#if CFE_DEBUG >= 1
-    printf("Finished function parsing CFE config\n");
-#endif
+    Log(DEBUG, "Finished function parsing CFE config\n");
 
     return BMI_SUCCESS;
 }
@@ -1143,9 +1041,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 static int Initialize (Bmi *self, const char *file)
 {
     // setup the logger
-    setup_logger();
-    Logger* logger = GetInstance();
-    Log(logger, "In CFE Initialize()\n", INFO);     
+    Log(INFO, "In CFE Initialize()\n");     
 
     //FIXME, we can use the input file to help imply "framework" support or "standalone"
     //an empty init file string indicates things will come from set_value???
@@ -1228,20 +1124,18 @@ static int Initialize (Bmi *self, const char *file)
         int forcing_line_count, max_forcing_line_length;
         int count_result = read_file_line_counts_cfe(cfe_bmi_data_ptr->forcing_file, &forcing_line_count, &max_forcing_line_length);
         if (count_result == -1) {
-            printf("Configured forcing file '%s' could not be opened for reading\n", cfe_bmi_data_ptr->forcing_file);
+            Log(ERROR, "Configured forcing file '%s' could not be opened for reading\n", cfe_bmi_data_ptr->forcing_file);
             return BMI_FAILURE;
         }
         if (forcing_line_count == 1) {
-            printf("Invalid header-only forcing file '%s'\n", cfe_bmi_data_ptr->forcing_file);
+            Log(ERROR, "Invalid header-only forcing file '%s'\n", cfe_bmi_data_ptr->forcing_file);
             return BMI_FAILURE;
         }
         // Infer the number of time steps: assume a header, so equal to the number of lines minus 1
         cfe_bmi_data_ptr->num_timesteps = forcing_line_count - 1;
     
-    #if CFE_DEBUG > 0
-        printf("Counts - Lines: %d | Max Line: %d | Num Time Steps: %d\n", forcing_line_count, max_forcing_line_length,
+        Log(INFO, "Counts - Lines: %d | Max Line: %d | Num Time Steps: %d\n", forcing_line_count, max_forcing_line_length,
                cfe_bmi_data_ptr->num_timesteps);
-    #endif
 
         // Now initialize empty arrays that depend on number of time steps
         cfe_bmi_data_ptr->forcing_data_precip_kg_per_m2 = malloc(sizeof(double) * (cfe_bmi_data_ptr->num_timesteps + 1));
@@ -1251,7 +1145,7 @@ static int Initialize (Bmi *self, const char *file)
         FILE* ffp = fopen(cfe_bmi_data_ptr->forcing_file, "r");
         // Ensure still exists
         if (ffp == NULL) {
-            printf("Forcing file '%s' disappeared!", cfe_bmi_data_ptr->forcing_file);
+            Log(ERROR, "Forcing file '%s' disappeared!", cfe_bmi_data_ptr->forcing_file);
             return BMI_FAILURE;
         }
     
@@ -1269,10 +1163,8 @@ static int Initialize (Bmi *self, const char *file)
             if (fgets(line_str, max_forcing_line_length + 1, ffp) == NULL)  // read in a line of AORC data.
                 return BMI_FAILURE;
             parse_aorc_line_cfe(line_str, &year, &month, &day, &hour, &minute, &dsec, &forcings);
-    #if CFE_DEBUG > 0
-            printf("Forcing data: [%s]\n", line_str);
-            printf("Forcing details - s_time: %ld | precip: %f\n", forcings.time, forcings.precip_kg_per_m2);
-    #endif
+            Log(INFO, "Forcing data: [%s]\n", line_str);
+            Log(INFO, "Forcing details - s_time: %ld | precip: %f\n", forcings.time, forcings.precip_kg_per_m2);
             cfe_bmi_data_ptr->forcing_data_precip_kg_per_m2[i] = forcings.precip_kg_per_m2; //* ((double)cfe_bmi_data_ptr->time_step_size);
             cfe_bmi_data_ptr->forcing_data_time[i] = forcings.time;
 
@@ -1323,10 +1215,8 @@ static int Initialize (Bmi *self, const char *file)
     else
       cfe_bmi_data_ptr->soil_reservoir.smc_profile = malloc(sizeof(double)*1);
     
-#if CFE_DEBUG > 0
-    printf("At declaration of smc_profile size, soil_reservoir.n_soil_layers = %i\n", cfe_bmi_data_ptr->soil_reservoir.n_soil_layers);
-#endif
-    Log(logger, "Success in CFE BMI Initialization\n", INFO);
+    Log(INFO, "At declaration of smc_profile size, soil_reservoir.n_soil_layers = %i\n", cfe_bmi_data_ptr->soil_reservoir.n_soil_layers);
+    Log(INFO, "Success in CFE BMI Initialization\n");
 
     return BMI_SUCCESS;
 }
@@ -1341,7 +1231,7 @@ static int Update (Bmi *self)
 //    double current_time, end_time;
 //    self->get_current_time(self, &current_time);
 //    self->get_end_time(self, &end_time);
-//    printf("end time: %lf\n", end_time);
+//    Log( DEBUG, "end time: %lf\n", end_time);
 //    if (current_time >= end_time) {
 //        return BMI_FAILURE;
 //    }
@@ -1398,7 +1288,7 @@ static int Update_until (Bmi *self, double t)
     }
     frac = n_steps - (int)n_steps;
     if (frac > 0){
-        printf("WARNING: CFE trying to update a fraction of a timestep\n");
+        Log( WARN, "WARNING: CFE trying to update a fraction of a timestep\n");
         
         // change timestep to remaining fraction & call update()
         cfe_ptr->time_step_size = frac * dt;
@@ -2155,8 +2045,8 @@ static int Get_state_var_names (Bmi *self, char ** names)
         //--------------------------------  
         // Option to print all the names
         //--------------------------------
-        // if (i==0) printf(" State variable names:");
-        // printf(" var name[%d] = %s\n", i, names[i]);
+        // if (i==0) Log( WARN, " State variable names:");
+        // Log( WARN, " var name[%d] = %s\n", i, names[i]);
     }
         
     return BMI_SUCCESS;
@@ -2189,8 +2079,8 @@ static int Get_state_var_types (Bmi *self, char ** types)
         //--------------------------------  
         // Option to print all the types
         //--------------------------------
-        // if (i==0) printf(" State var_types:");
-        // printf(" var type[%d] = %s\n", i, types[i]);
+        // if (i==0) Log( WARN, " State var_types:");
+        // Log( WARN, " var type[%d] = %s\n", i, types[i]);
     }
         
     return BMI_SUCCESS;
@@ -3105,11 +2995,11 @@ extern void initialize_volume_trackers(cfe_state_struct* cfe_ptr){
 /**************************************************************************/
 /**************************************************************************/
 extern void print_cfe_flux_header(){
-    printf("#    ,            hourly ,  direct,   giuh ,lateral,  base,   total, storage, ice fraction, ice fraction \n");
-    printf("Time [h],rainfall [mm],runoff [mm],runoff [mm],flow [mm],flow [mm],discharge [mm],storage [mm],schaake [mm],xinan [-]\n");
+    Log(INFO, "#    ,            hourly ,  direct,   giuh ,lateral,  base,   total, storage, ice fraction, ice fraction \n");
+    Log(INFO, "Time [h],rainfall [mm],runoff [mm],runoff [mm],flow [mm],flow [mm],discharge [mm],storage [mm],schaake [mm],xinan [-]\n");
 }
 extern void print_cfe_flux_at_timestep(cfe_state_struct* cfe_ptr){
-  printf("%d, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n",
+  Log(INFO, "%d, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n",
                            cfe_ptr->current_time_step,
                            cfe_ptr->timestep_rainfall_input_m*1000.0,
                            *cfe_ptr->flux_output_direct_runoff_m*1000.0,
@@ -3153,16 +3043,16 @@ extern void mass_balance_check(cfe_state_struct* cfe_ptr){
     
     global_residual = cfe_ptr->vol_struct.volstart + cfe_ptr->vol_struct.volin - 
                       cfe_ptr->vol_struct.volout - volend - vol_end_giuh;
-    printf("GLOBAL MASS BALANCE\n");
-    printf("  initial volume: %8.4lf m\n",cfe_ptr->vol_struct.volstart);
-    printf("    volume input: %8.4lf m\n",cfe_ptr->vol_struct.volin);
-    printf("   volume output: %8.4lf m\n",cfe_ptr->vol_struct.volout);
-    printf("    final volume: %8.4lf m\n",volend);
-    printf("        residual: %6.4e m\n",global_residual);
-    if(cfe_ptr->vol_struct.volin>0.0) printf("global pct. err: %6.4e percent of inputs\n",global_residual/cfe_ptr->vol_struct.volin*100.0);
-    else          printf("global pct. err: %6.4e percent of initial\n",global_residual/cfe_ptr->vol_struct.volstart*100.0);
+    Log(INFO, "GLOBAL MASS BALANCE\n");
+    Log(INFO, "  initial volume: %8.4lf m\n",cfe_ptr->vol_struct.volstart);
+    Log(INFO, "    volume input: %8.4lf m\n",cfe_ptr->vol_struct.volin);
+    Log(INFO, "   volume output: %8.4lf m\n",cfe_ptr->vol_struct.volout);
+    Log(INFO, "    final volume: %8.4lf m\n",volend);
+    Log(INFO, "        residual: %6.4e m\n",global_residual);
+    if(cfe_ptr->vol_struct.volin>0.0) Log(INFO, "global pct. err: %6.4e percent of inputs\n",global_residual/cfe_ptr->vol_struct.volin*100.0);
+    else          Log(INFO, "global pct. err: %6.4e percent of initial\n",global_residual/cfe_ptr->vol_struct.volstart*100.0);
     if(!is_fabs_less_than_epsilon(global_residual,1.0e-12)) 
-                  printf("WARNING: GLOBAL MASS BALANCE CHECK FAILED\n");
+                  Log(WARN, "WARNING: GLOBAL MASS BALANCE CHECK FAILED\n");
     
     /* xinanjiang_dev
     schaake_residual = cfe_ptr->vol_struct.volin - cfe_ptr->vol_struct.vol_sch_runoff - cfe_ptr->vol_struct.vol_sch_infilt;
@@ -3173,66 +3063,66 @@ extern void mass_balance_check(cfe_state_struct* cfe_ptr){
     if(!is_fabs_less_than_epsilon(schaake_residual,1.0e-12))
                   printf("WARNING: SCHAAKE PARTITIONING MASS BALANCE CHECK FAILED\n");*/
     direct_residual = cfe_ptr->vol_struct.volin - cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_infilt-cfe_ptr->vol_struct.vol_et_from_rain;
-    printf(" DIRECT RUNOFF MASS BALANCE\n");
-    printf("  surface runoff: %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
-    printf("    infiltration: %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
-    printf("    vol_et_from_rain: %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
-    printf("direct residual: %6.4e m\n",direct_residual);  // should equal 0.0
+    Log(INFO, " DIRECT RUNOFF MASS BALANCE\n");
+    Log(INFO, "  surface runoff: %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
+    Log(INFO, "    infiltration: %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
+    Log(INFO, "    vol_et_from_rain: %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
+    Log(INFO, "direct residual: %6.4e m\n",direct_residual);  // should equal 0.0
     if(!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
-                  printf("WARNING: DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
+                  Log(WARN, "WARNING: DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
     
     /* xinanjiang_dev
     giuh_residual = cfe_ptr->vol_struct.vol_out_giuh - cfe_ptr->vol_struct.vol_sch_runoff - vol_end_giuh;   */
     giuh_residual = cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_out_giuh - vol_end_giuh;
-    printf(" GIUH MASS BALANCE\n");
+    Log(INFO, " GIUH MASS BALANCE\n");
 
     /* xinanjiang_dev
-    printf("  vol. into giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_runoff);    */
-    printf("  vol. into giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
-    fprintf(stderr,"   vol. out giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_out_giuh);
-    fprintf(stderr," vol. end giuh q: %8.4lf m\n",cfe_ptr->vol_struct.vol_end_giuh);
-    printf("   giuh residual: %6.4e m\n",giuh_residual);  // should equal zero
+    Log(INFO, "  vol. into giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_runoff);    */
+    Log(INFO, "  vol. into giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
+    Log(ERROR, "   vol. out giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_out_giuh);
+    Log(ERROR, " vol. end giuh q: %8.4lf m\n",cfe_ptr->vol_struct.vol_end_giuh);
+    Log(INFO, "   giuh residual: %6.4e m\n",giuh_residual);  // should equal zero
     if(!is_fabs_less_than_epsilon(giuh_residual,1.0e-12))
-                  printf("WARNING: GIUH MASS BALANCE CHECK FAILED\n");
+                  Log(WARN, "WARNING: GIUH MASS BALANCE CHECK FAILED\n");
 
     /* xinanjiang_dev 
     soil_residual=cfe_ptr->vol_struct.vol_soil_start + cfe_ptr->vol_struct.vol_sch_infilt -      */
     soil_residual=cfe_ptr->vol_struct.vol_soil_start + cfe_ptr->vol_struct.vol_infilt -
                   cfe_ptr->vol_struct.vol_soil_to_lat_flow - vol_soil_end - cfe_ptr->vol_struct.vol_to_gw - cfe_ptr->vol_struct.vol_et_from_soil;
                   
-    printf(" SOIL WATER CONCEPTUAL RESERVOIR MASS BALANCE\n");
-    printf("   init soil vol: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_start);     
+    Log(INFO, " SOIL WATER CONCEPTUAL RESERVOIR MASS BALANCE\n");
+    Log(INFO, "   init soil vol: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_start);     
 
     /* xinanjiang_dev
-    printf("  vol. into soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_infilt);    */
-    printf("  vol. into soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
-    printf("vol.soil2latflow: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_lat_flow);
-    printf(" vol. soil to gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_gw);
-    printf(" final vol. soil: %8.4lf m\n",vol_soil_end);  
-    printf(" vol. et from soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_soil);  
-    printf("vol. soil resid.: %6.4e m\n",soil_residual);
+    Log(INFO, "  vol. into soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_infilt);    */
+    Log(INFO, "  vol. into soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
+    Log(INFO, "vol.soil2latflow: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_lat_flow);
+    Log(INFO, " vol. soil to gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_gw);
+    Log(INFO, " final vol. soil: %8.4lf m\n",vol_soil_end);  
+    Log(INFO, " vol. et from soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_soil);  
+    Log(INFO, "vol. soil resid.: %6.4e m\n",soil_residual);
     if(!is_fabs_less_than_epsilon(soil_residual,1.0e-12))
-                   printf("WARNING: SOIL CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
+                   Log(WARN, "WARNING: SOIL CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
     
     nash_residual=cfe_ptr->vol_struct.vol_in_nash - cfe_ptr->vol_struct.vol_out_nash - vol_in_nash_end;
-    printf(" NASH CASCADE CONCEPTUAL RESERVOIR MASS BALANCE\n");
-    printf("    vol. to nash: %8.4lf m\n",cfe_ptr->vol_struct.vol_in_nash);
-    printf("  vol. from nash: %8.4lf m\n",cfe_ptr->vol_struct.vol_out_nash);
-    printf(" final vol. nash: %8.4lf m\n",vol_in_nash_end);
-    printf("nash casc resid.: %6.4e m\n",nash_residual);
+    Log(INFO, " NASH CASCADE CONCEPTUAL RESERVOIR MASS BALANCE\n");
+    Log(INFO, "    vol. to nash: %8.4lf m\n",cfe_ptr->vol_struct.vol_in_nash);
+    Log(INFO, "  vol. from nash: %8.4lf m\n",cfe_ptr->vol_struct.vol_out_nash);
+    Log(INFO, " final vol. nash: %8.4lf m\n",vol_in_nash_end);
+    Log(INFO, "nash casc resid.: %6.4e m\n",nash_residual);
     if(!is_fabs_less_than_epsilon(nash_residual,1.0e-12))
-                   printf("WARNING: NASH CASCADE CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
+        Log(WARN, "WARNING: NASH CASCADE CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
     
     
     gw_residual = cfe_ptr->vol_struct.vol_in_gw_start + cfe_ptr->vol_struct.vol_to_gw - cfe_ptr->vol_struct.vol_from_gw - vol_in_gw_end;
-    printf(" GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE\n");
-    printf("init gw. storage: %8.4lf m\n",cfe_ptr->vol_struct.vol_in_gw_start);
-    printf("       vol to gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_to_gw);
-    printf("     vol from gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_from_gw);
-    printf("final gw.storage: %8.4lf m\n",vol_in_gw_end);
-    printf("    gw. residual: %6.4e m\n",gw_residual);
+    Log(INFO, " GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE\n");
+    Log(INFO, "init gw. storage: %8.4lf m\n",cfe_ptr->vol_struct.vol_in_gw_start);
+    Log(INFO, "       vol to gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_to_gw);
+    Log(INFO, "     vol from gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_from_gw);
+    Log(INFO, "final gw.storage: %8.4lf m\n",vol_in_gw_end);
+    Log(INFO, "    gw. residual: %6.4e m\n",gw_residual);
     if(!is_fabs_less_than_epsilon(gw_residual,1.0e-12))
-                   fprintf(stderr,"WARNING: GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
+        Log(WARN, "WARNING: GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
 }
 
 /**************************************************************************/
@@ -3354,7 +3244,7 @@ void itwo_alloc_cfe(int ***array, int rows, int cols) {
     int i, frows, fcols;
 
     if ((rows == 0) || (cols == 0)) {
-        printf("Error: Attempting to allocate array of size 0\n");
+        Log(ERROR, "Error: Attempting to allocate array of size 0\n");
     }
 
     frows = rows + 1;  /* added one for FORTRAN numbering */
@@ -3379,7 +3269,7 @@ void dtwo_alloc_cfe(double ***array, int rows, int cols) {
     int i, frows, fcols;
 
     if ((rows == 0) || (cols == 0)) {
-        printf("Error: Attempting to allocate array of size 0\n");
+        Log(ERROR, "Error: Attempting to allocate array of size 0\n");
     }
 
     frows = rows + 1;  /* added one for FORTRAN numbering */
@@ -3405,7 +3295,7 @@ void d_alloc_cfe(double **var, int size) {
 
     *var = (double *) malloc(size * sizeof(double));
     if (*var == NULL) {
-        printf("Problem allocating memory for array in d_alloc.\n");
+        Log(ERROR, "Problem allocating memory for array in d_alloc.\n");
         return;
     } else
         memset(*var, 0, size * sizeof(double));
@@ -3417,7 +3307,7 @@ void i_alloc_cfe(int **var, int size) {
 
     *var = (int *) malloc(size * sizeof(int));
     if (*var == NULL) {
-        printf("Problem allocating memory in i_alloc\n");
+        Log(ERROR, "Problem allocating memory in i_alloc\n");
         return;
     } else
         memset(*var, 0, size * sizeof(int));
