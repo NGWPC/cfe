@@ -629,7 +629,9 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         }
         if (strcmp(param_key, "gw_storage") == 0) {
             model->gw_reservoir.gw_storage = strtod(param_value, NULL);
-            model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m; //edited by RLM to fix units from [m/m] to [m]
+	    // YLiu: move the calculation of GW storage out of the FOR loop so that the position of gw_storage 
+	    // relative to that of max_gw_storage in the config file would not matter
+            //model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m; //edited by RLM to fix units from [m/m] to [m]
             is_gw_storage_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
@@ -705,6 +707,11 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             continue;
         }
 
+    // compute gw storage in meters	
+    if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
+        model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m;
+    }
+    
         /*-------------------- Root zone AET development -rlm -----------------------*/
 	if (strcmp(param_key, "aet_rootzone") == 0) {
 
