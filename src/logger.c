@@ -29,14 +29,18 @@ char* createTimestamp() {
 
     struct tm* timeinfo = gmtime(&now);
     strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S:", timeinfo);
-    snprintf(buffer1, sizeof(buffer1), "%03d/", (int)millis);
+    snprintf(buffer1, sizeof(buffer1), "%03d", (int)millis);
     strcat(buffer, buffer1);
 
     return buffer;
 }
 
-void SetLogPreferences(Logger* logger, LogLevel level) {
-    logger->logLevel = level;
+void SetLogPreferences(Logger* logger) {
+#ifdef LOG_LEVEL    
+    logger->logLevel = LOG_LEVEL;
+#else 
+    logger->logLevel = INFO;
+#endif
 
 	// get the log file path
 	char * log_file_path;
@@ -44,13 +48,13 @@ void SetLogPreferences(Logger* logger, LogLevel level) {
 
     logger->logFile = fopen(log_file_path, "a");
     if (logger->logFile == NULL) {
-        printf("Can't Open Log File\n");
+        printf("Can't Open Log File for CFE\n");
         // create local log directory and file
         const char* logFileDir = "./run_logs/ngen_";
         char fullPath[256];
         snprintf(fullPath, sizeof(fullPath), "%s%s/", logFileDir, createTimestamp());
 
-        printf("Log File Directory: %s\n", fullPath);
+        printf("CFE Log File Directory: %s\n", fullPath);
 
         char mkdir_cmd[512];
         snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", fullPath);
@@ -58,33 +62,42 @@ void SetLogPreferences(Logger* logger, LogLevel level) {
         if (status == -1) {
             fprintf(stderr, "Error: %s\n", strerror(errno));
         } else {
-            printf("Directories are created\n");
+            printf("Directories are created for CFE\n");
         }
 
         char logFilePath[512];
         snprintf(logFilePath, sizeof(logFilePath), "%scfe_log.txt", fullPath);
         logger->logFile = fopen(logFilePath, "w");
         if (logger->logFile == NULL) {
-            fprintf(stderr, "Can't Open local Log File\n");
+            fprintf(stderr, "Can't Open local Log File for CFE\n");
         }
         else {
-            printf("Log File Path: %s\n", logFilePath);
+            printf("CFE Log File Path: %s\n", logFilePath);
         }
     }
     else {
-        printf("Log File Path: %s\n", log_file_path);
+        printf("CFE Log File Path: %s\n", log_file_path);
     }
 }
 
 Logger* GetInstance() {
     if (loggerInstance == NULL) {
         loggerInstance = (Logger*)malloc(sizeof(Logger));
-        SetLogPreferences(loggerInstance, NONE);
+        SetLogPreferences(loggerInstance);
     }
     return loggerInstance;
 }
 
-void Log(Logger* logger, const char* message, LogLevel messageLevel) {
+void Log(LogLevel messageLevel, const char* message, ...) {
+    Logger* logger = GetInstance();
+    va_list arglist;
+    va_start(arglist, message);
+
+    int length = vsnprintf(NULL, 0, message, arglist);
+    char *buffer = malloc(length * sizeof *buffer); 
+    vsnprintf(buffer, length, message, arglist);
+    va_end(arglist);
+
     if (messageLevel >= logger->logLevel) {
         const char* logType;
         switch (messageLevel) {
@@ -98,13 +111,15 @@ void Log(Logger* logger, const char* message, LogLevel messageLevel) {
 
         char final_message[1024];
         snprintf(final_message, sizeof(final_message), "%s %s %s%s\n", 
-                 createTimestamp(), module_name[CFE], logType, message);
+                 createTimestamp(), module_name[CFE], logType, buffer);
         
         if (logger->logFile != NULL) {
             fprintf(logger->logFile, "%s", final_message);
             fflush(logger->logFile);
         }
     }
+    
+    free(buffer);
 }
 
 LogLevel GetLogLevel(const char* logLevel) {
@@ -116,20 +131,19 @@ LogLevel GetLogLevel(const char* logLevel) {
     return NONE;
 }
 
-void setup_logger(void) {
-    Logger* logger = GetInstance();
-
-    Log(logger, "Sample Log for LogLevel::ERROR", ERROR);
-    Log(logger, "Sample Log for LogLevel::FATAL", FATAL);
-    Log(logger, "Sample Log for LogLevel::WARN", WARN);
-    Log(logger, "Sample Log for LogLevel::INFO", INFO);
+void setup_logger() {
+    LogLevel level = ERROR;
+    Log(ERROR, "Sample Log for LogLevel::%d", level);
+    Log(FATAL, "Sample Log for LogLevel::FATAL");
+    Log(WARN, "Sample Log for LogLevel::WARN");
+    Log(INFO, "Sample Log for LogLevel::INFO");
     
     const char* multiline_log = 
         "First line of multiline log:\n"
         "   Indented second line of multiline log\n"
         "         Indented third line of multiline log\n"
         "                Indented fourth line of multiline log";
-    Log(logger, multiline_log, INFO);
+    Log(INFO, multiline_log);
     
-    Log(logger, "Sample Log for LogLevel::DEBUG", DEBUG);
+    Log(DEBUG, "Sample Log for LogLevel::DEBUG");
 }
