@@ -706,11 +706,6 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_verbosity_set = TRUE;
             continue;
         }
-
-    // compute gw storage in meters	
-    if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
-        model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m;
-    }
     
         /*-------------------- Root zone AET development -rlm -----------------------*/
 	if (strcmp(param_key, "aet_rootzone") == 0) {
@@ -864,6 +859,12 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         Log(ERROR, "Config param 'gw_storage' not found in config file\n");
         return BMI_FAILURE;
     }
+    
+    // compute gw storage in meters	
+    if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
+        model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m;
+    }
+
     if (is_num_timesteps_set == FALSE && strcmp(model->forcing_file, "BMI")) {
         Log(ERROR, "Config param 'num_timesteps' not found in config file\n");
         return BMI_FAILURE;
