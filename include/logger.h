@@ -1,66 +1,18 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 #include <stdarg.h> // for variable args: va_list
 
 typedef enum {      
     NONE = 0,
-    DEBUG,
-    INFO,
-    FATAL,
-    WARN,
-    ERROR,
+    DEBUG = 1,
+    INFO = 2,
+    WARNING = 3,  // CM: Change when Kyle is ready
+    SEVERE = 4,   // CM: Change when Kyle is ready
+    FATAL = 5,
 } LogLevel;
 
-typedef enum {
-    NGEN,
-    NOAHOWP,
-    SNOW17,
-    UEB,
-    CFE,
-    SACSMA,
-    LASAM,
-    SMP,
-    SFT,
-    TROUTE,
-    SCHISM,
-    SFINCS,
-    GC2D,
-    TOPOFLOW,
-    MODULE_COUNT
-} LoggingModule;
-
-static const char* module_name[MODULE_COUNT] = {
-    "NGEN    ",
-    "NOAHOWP ",
-    "SNOW17  ",
-    "UEB     ",
-    "CFE     ",
-    "SACSMA  ",
-    "LASAM   ",
-    "SMP     ",
-    "SFT     ",
-    "TROUTE  ",
-    "SCHISM  ",
-    "SFINCS  ",
-    "GC2D    ",
-    "TOPOFLOW"
-};
-
-typedef struct {
-    LogLevel logLevel;
-    FILE* logFile;
-} Logger;
-
-Logger* GetInstance();
-void SetLogPreferences(Logger* logger);
+// Public Methods
 void Log(LogLevel messageLevel, const char* message, ...);
-LogLevel GetLogLevel(const char* logLevel);
-char* createTimestamp();
-void setup_logger(void);
 
-#endif
+#endif // LOGGER_H
