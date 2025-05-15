@@ -7,8 +7,8 @@ typedef enum {
     NONE = 0,
     DEBUG = 1,
     INFO = 2,
-    WARNING = 3,  // CM: Change when Kyle is ready
-    SEVERE = 4,   // CM: Change when Kyle is ready
+    WARNING = 3,
+    SEVERE = 4,
     FATAL = 5,
 } LogLevel;
 
