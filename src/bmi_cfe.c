@@ -12,28 +12,38 @@
 #define STANDARD_ATMOSPHERIC_PRESSURE_PASCALS 101325
 #endif
 
+/******************************************************************************************************
+  Conceptual Functional Equivalent (CFE) to WRF-Hydro Based National Water Model (Version 3.1 and earlier).
+  Conceived by Fred Ogden, May 2020. Adapted to BMI by Jonathan Frame and Jessica Garrett, May 2021.
+  Modified to replace GIUH with Nash Cascade with ability to simulate retention depth and runon/channel
+  infiltration by Ahmad Jan Khattak, May 2024.
+*******************************************************************************************************/
+
+#define CFE_DEBUG 0
+
 #define INPUT_VAR_NAME_COUNT 5
-#define OUTPUT_VAR_NAME_COUNT 13
+#define OUTPUT_VAR_NAME_COUNT 15
 
-#define STATE_VAR_NAME_COUNT 94   // must match var_info array size
+#define STATE_VAR_NAME_COUNT 95   // must match var_info array size
 
 
-#define PARAM_VAR_NAME_COUNT 17
+#define PARAM_VAR_NAME_COUNT 18
 // NOTE: If you update the params, also update the unit test in ../test/main_unit_test_bmi.c
 static const char *param_var_names[PARAM_VAR_NAME_COUNT] = {
     "maxsmc", "satdk", "slope", "b", "Klf", 
     "Kn", "Cgw", "expon", "max_gw_storage",
     "satpsi","wltsmc","alpha_fc","refkdt",
     "a_Xinanjiang_inflection_point_parameter","b_Xinanjiang_shape_parameter","x_Xinanjiang_shape_parameter",
-    "N_nash"
+    "Kinf_nash_surface",
+    "retention_depth_nash_surface"
 };
 
 static const char *param_var_types[PARAM_VAR_NAME_COUNT] = {
     "double", "double", "double", "double", "double",
     "double", "double", "double", "double",
     "double", "double", "double", "double",
-    "double","double","double",
-    "int"
+    "double","double","double", "double",
+    "double"
 };
 //----------------------------------------------
 // Put variable info into a struct to simplify
@@ -106,25 +116,25 @@ Variable var_info[] = {
 	{ 43, "volout",                "double", 1 },
 	{ 44, "volin",                 "double", 1 },
 	{ 45, "vol_from_gw",           "double", 1 },
-	{ 46, "vol_out_giuh",          "double", 1 },
+	{ 46, "vol_out_surface",       "double", 1 },
 	{ 47, "vol_in_nash",           "double", 1 },
 	{ 48, "vol_out_nash",          "double", 1 },
 	{ 49, "vol_in_gw_start",       "double", 1 },
 	{ 50, "vol_soil_start",        "double", 1 },
-	//-----------------------------------------         
+	//-----------------------------------------
 	// More top-level, static allocation vars
 	//-----------------------------------------
-	{ 51, "epoch_start_time",      "long", 1 },
-	{ 52, "num_timesteps",         "int",  1 },
-	{ 53, "current_time_step",     "int",  1 },
-	{ 54, "time_step_size",        "int",  1 },
-	{ 55, "is_forcing_from_bmi",   "int",  1 },
-	{ 56, "forcing_file",          "string", 1 },  // strlen
-	{ 57, "surface_partitioning_scheme", "int", 1 }, // from direct_runoff_params_struct
-	{ 58, "N_nash",                      "int",    1 },
-	{ 59, "K_lf",                        "double", 1 },
-	{ 60, "K_nash",                      "double", 1 },
-	{ 61, "num_giuh_ordinates",          "int",    1 },
+	{ 51, "epoch_start_time",                  "long",   1 },
+	{ 52, "num_timesteps",                     "int",    1 },
+	{ 53, "current_time_step",                 "int",    1 },
+	{ 54, "time_step_size",                    "int",    1 },
+	{ 55, "is_forcing_from_bmi",               "int",    1 },
+	{ 56, "forcing_file",                      "string", 1 },  // strlen
+	{ 57, "surface_water_partitioning_scheme", "int",    1 }, // from infiltration_excess_params_struct
+	{ 58, "N_nash_subsurface",                 "int",    1 },
+	{ 59, "K_lf",                              "double", 1 },
+	{ 60, "K_nash_subsurface",                 "double", 1 },
+	{ 61, "num_giuh_ordinates",                "int",    1 },
 	//---------------------------------------
 	// Vars in aorc_forcing_data_cfe struct
 	//---------------------------------------
@@ -139,17 +149,17 @@ Variable var_info[] = {
 	{ 70, "latitude",                       "double", 1 },
 	{ 71, "longitude",                      "double", 1 },
 	{ 72, "time",                           "long",   1 },
-	//------------------------------------------         
+	//------------------------------------------
 	// More top-level, dynamic allocation vars
 	// (all pointers except verbosity)
 	//------------------------------------------
 	{ 73, "forcing_data_precip_kg_per_m2",  "double*", 1 },
 	{ 74, "forcing_data_time",              "long*",   1 },
 	{ 75, "giuh_ordinates",                 "double*", 1 },  // num_giuh
-	{ 76, "nash_storage",                   "double*", 1 },  // num_lat_flow
+	{ 76, "nash_storage_subsurface",        "double*", 1 },  // num_lat_flow
 	{ 77, "runoff_queue_m_per_timestep",    "double*", 1 },  // num_giuh
 	{ 78, "flux_Schaake_output_runoff_m",   "double*", 1 },
-	{ 79, "flux_giuh_runoff_m",             "double*", 1 },
+	{ 79, "flux_direct_runoff_m",           "double*", 1 },
 	{ 80, "flux_nash_lateral_runoff_m",     "double*", 1 },
 	{ 81, "flux_from_deep_gw_to_chan_m",    "double*", 1 },
 	{ 82, "flux_from_soil_to_gw_m",         "double*", 1 },
@@ -158,7 +168,7 @@ Variable var_info[] = {
 	{ 85, "flux_Qout_m",                    "double*", 1 },
 	{ 86, "verbosity",                      "int",     1 },
 	//---------------------------------------
-	// direct_runoff_params_struct vars
+	// infiltration_excess_runoff_params_struct vars
 	// xinanjiang or schaake flag [56]
 	//---------------------------------------
 	{ 87, "Schaake_adjusted_magic_constant_by_soil_type",   "double", 1},
@@ -169,9 +179,11 @@ Variable var_info[] = {
 	// Root zone adjusted AET development -rlm -AJ
 	// -------------------------------------------
 	{ 91, "soil_moisture_profile",                   "double", 1},
-        { 92, "soil_layer_depths_m",			 "double", 1},
-        { 93, "max_rootzone_layer",                     "int", 1},
+    { 92, "soil_layer_depths_m",			 "double", 1},
+    { 93, "max_rootzone_layer",                      "int", 1},
 	//--------------------------------------------
+	{ 94, "nwm_ponded_depth",                        "double", 1},
+
 };
 
 int i = 0;
@@ -180,18 +192,20 @@ int j = 0;
 // Don't forget to update Get_value/Get_value_at_indices (and setter) implementation if these are adjusted
 static const char *output_var_names[OUTPUT_VAR_NAME_COUNT] = {
         "RAIN_RATE",
-        "DIRECT_RUNOFF",
         "GIUH_RUNOFF",
+        "INFILTRATION_EXCESS",
+        "DIRECT_RUNOFF",
         "NASH_LATERAL_RUNOFF",
         "DEEP_GW_TO_CHANNEL_FLUX",
-	"SOIL_TO_GW_FLUX",
+	    "SOIL_TO_GW_FLUX",
         "Q_OUT",
         "POTENTIAL_ET",
         "ACTUAL_ET",
         "GW_STORAGE",
         "SOIL_STORAGE",
-	"SOIL_STORAGE_CHANGE",
-	"SURF_RUNOFF_SCHEME"
+        "SOIL_STORAGE_CHANGE",
+        "SURF_RUNOFF_SCHEME",
+	    "NWM_PONDED_DEPTH"
 };
 
 static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
@@ -206,8 +220,10 @@ static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
         "double",
         "double",
       	"double",
-	"double",
-	"int"
+	    "double",
+        "double",
+	    "int",
+	    "double"
 };
 
 static const int output_var_item_count[OUTPUT_VAR_NAME_COUNT] = {
@@ -218,12 +234,14 @@ static const int output_var_item_count[OUTPUT_VAR_NAME_COUNT] = {
         1,
         1,
       	1,
-	1,
-	1,
+	    1,
+	    1,
         1,
         1,
         1,
-	1
+	    1,
+	    1,
+	    1
 };
 
 static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
@@ -238,8 +256,10 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
         "m",
         "m",
       	"m",
-	"m",
-	"none"
+	    "m",
+	    "m",
+	    "none",
+	    "m"
 };
 
 static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
@@ -255,7 +275,9 @@ static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
         0,
         0,
         0,
-	0
+        0,
+        0,
+        0
 };
 
 static const char *output_var_locations[OUTPUT_VAR_NAME_COUNT] = {
@@ -271,6 +293,8 @@ static const char *output_var_locations[OUTPUT_VAR_NAME_COUNT] = {
         "node",
         "node",
         "node",
+	"node",
+	"none",
 	"node"
 };
 
@@ -444,7 +468,6 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     //    - number of Nash lf reservoirs (optional, defaults to 2, ignored if storage values present)
     //    - K_nash
     //    - initial Nash storage values (optional, defaults to 0.0 for all reservoirs according to number)
-    //    - GIUH ordinates
 
     char config_line[max_config_line_length + 1];
 
@@ -466,18 +489,18 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     int is_expon_set               = FALSE;
     int is_alpha_fc_set            = FALSE;
     int is_soil_storage_set        = FALSE;
-    int is_K_nash_set              = FALSE;
+    int is_K_nash_subsurface_set   = FALSE;
     int is_K_lf_set                = FALSE;
     int is_num_timesteps_set       = FALSE;
     int is_verbosity_set           = FALSE;
 
     /* xinanjiang_dev*/
-    int is_direct_runoff_method_set         = FALSE;
+    int is_infiltration_excess_method_set              = FALSE;
     int is_a_Xinanjiang_inflection_point_parameter_set = FALSE;
-    int is_b_Xinanjiang_shape_parameter_set = FALSE;
-    int is_x_Xinanjiang_shape_parameter_set = FALSE;
-    int is_urban_decimal_fraction_set       = FALSE;
-    
+    int is_b_Xinanjiang_shape_parameter_set            = FALSE;
+    int is_x_Xinanjiang_shape_parameter_set            = FALSE;
+    int is_urban_decimal_fraction_set                  = FALSE;
+
     /* Ice fraction */
     int is_sft_coupled_set           = FALSE;
     int is_ice_content_threshold_set = FALSE;
@@ -493,13 +516,26 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     int is_soil_layer_depths_string_val_set = FALSE;
     int is_max_rootzone_layer_set           = FALSE;
     /*--------------------------------------------------------*/
+
+    /* ------------ Nash model struct -AJK ------------------ */
+    int is_surface_runoff_scheme_set          = FALSE;
+    int is_K_nash_surface_set                 = FALSE;
+    int is_N_nash_surface_set                 = FALSE;
+    int is_nsubsteps_nash_surface_set         = FALSE;
+    int is_nash_storage_surface_set           = FALSE;
+    int is_K_infiltration_nash_surface_set    = FALSE;
+    int is_retention_depth_nash_surface_set   = FALSE;
+	
+    char* nash_storage_surface_string_val;
+    /*--------------------------------------------------------*/
+
     // Default value
     model->NWM_soil_params.refkdt = 3.0;
 
     // Also keep track of Nash stuff and properly set at the end of reading the config file
-    model->N_nash = 2;
-    char* nash_storage_string_val;
-    int is_nash_storage_string_val_set = FALSE;
+    model->N_nash_subsurface = 2;
+    char* nash_storage_subsurface_string_val;
+    int is_nash_storage_subsurface_string_val_set = FALSE;
     // Similarly as for Nash, track stuff for GIUH ordinates
     char* giuh_originates_string_val;
     char* soil_layer_depths_string_val;
@@ -536,7 +572,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__depth_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -550,7 +586,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__satdk_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -559,7 +595,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__satpsi_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -568,7 +604,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__slop_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -577,7 +613,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__smcmax_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -586,7 +622,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_params__wltsmc_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
@@ -629,13 +665,13 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         }
         if (strcmp(param_key, "gw_storage") == 0) {
             model->gw_reservoir.gw_storage = strtod(param_value, NULL);
-	    // YLiu: move the calculation of GW storage out of the FOR loop so that the position of gw_storage 
-	    // relative to that of max_gw_storage in the config file would not matter
+	        // YLiu: move the calculation of GW storage out of the FOR loop so that the position of gw_storage 
+	        // relative to that of max_gw_storage in the config file would not matter
             //model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m; //edited by RLM to fix units from [m/m] to [m]
             is_gw_storage_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
 /*            char* trailing_chars;
             gw_storage_literal = strtod(param_value, &trailing_chars);
@@ -667,17 +703,21 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_soil_storage_set = TRUE;
             // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-                Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+                Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
             continue;
         }
-        if (strcmp(param_key, "number_nash_reservoirs") == 0 || strcmp(param_key, "N_nash") == 0) {
-            model->N_nash = strtol(param_value, NULL, 10);
+        if (strcmp(param_key, "N_nash_subsurface") == 0) {
+            model->N_nash_subsurface = strtol(param_value, NULL, 10);
             continue;
         }
-        if (strcmp(param_key, "K_nash") == 0) {
-            model->K_nash = strtod(param_value, NULL);
-            is_K_nash_set = TRUE;
+        if (strcmp(param_key, "K_nash_subsurface") == 0 || strcmp(param_key, "K_nash") == 0) {
+            model->K_nash_subsurface = strtod(param_value, NULL);
+            is_K_nash_subsurface_set = TRUE;
+	    // Check if units are present and print warning if missing from config file
+            if ((param_units == NULL) || (strlen(param_units) < 1)) {
+	          Log(WARNING, "[units] expected for '%s' in config file. [1/hour]\n", param_key);
+            }
             continue;
         }
         if (strcmp(param_key, "K_lf") == 0) {
@@ -685,9 +725,9 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             is_K_lf_set = TRUE;
             continue;
         }
-        if (strcmp(param_key, "nash_storage") == 0) {
-            nash_storage_string_val = strdup(param_value);
-            is_nash_storage_string_val_set = TRUE;
+        if (strcmp(param_key, "nash_storage_subsurface") == 0) {
+            nash_storage_subsurface_string_val = strdup(param_value);
+            is_nash_storage_subsurface_string_val_set = TRUE;
             continue;
         }
         if (strcmp(param_key, "giuh_ordinates") == 0) {
@@ -708,7 +748,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         }
     
         /*-------------------- Root zone AET development -rlm -----------------------*/
-	if (strcmp(param_key, "aet_rootzone") == 0) {
+	if (strcmp(param_key, "is_aet_rootzone") == 0) {
 
 	  if ( strcmp(param_value, "true")==0 || strcmp(param_value, "True")==0 || strcmp(param_value,"1")==0)
 	    is_aet_rootzone_set = TRUE;
@@ -729,89 +769,148 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 	  }
 	}
 
-        /*--------------------------------------------------------------------------*/
+	/*--------------------------------------------------------------------------*/
 
-        /* xinanjiang_dev: Need the option to run either runoff method in the config file, 
-        *//////////////////////////////////////////////////////////////////////////////
-        if (strcmp(param_key, "surface_partitioning_scheme") == 0) {
-            if (strcmp(param_value, "Schaake")==0 || strcmp(param_value, "schaake")==0 || strcmp(param_value,"1")==0 )
-                model->direct_runoff_params_struct.surface_partitioning_scheme = Schaake;
-            if (strcmp(param_value, "Xinanjiang")==0 || strcmp(param_value, "xinanjiang")==0 || strcmp(param_value,"2")==0)
-                model->direct_runoff_params_struct.surface_partitioning_scheme = Xinanjiang;
-            is_direct_runoff_method_set = TRUE;
-	    continue;
-        }
-        if (model->direct_runoff_params_struct.surface_partitioning_scheme == Xinanjiang) {  //Check that logical statement is correct
-            if (strcmp(param_key, "a_Xinanjiang_inflection_point_parameter") == 0){
-                model->direct_runoff_params_struct.a_Xinanjiang_inflection_point_parameter = strtod(param_value, NULL);
-                is_a_Xinanjiang_inflection_point_parameter_set = TRUE;
-            }
-            if (strcmp(param_key, "b_Xinanjiang_shape_parameter") == 0) {
-                model->direct_runoff_params_struct.b_Xinanjiang_shape_parameter = strtod(param_value, NULL);
-                is_b_Xinanjiang_shape_parameter_set = TRUE;
-            }
-            if (strcmp(param_key, "x_Xinanjiang_shape_parameter") == 0) {
-                model->direct_runoff_params_struct.x_Xinanjiang_shape_parameter = strtod(param_value, NULL);
-                is_x_Xinanjiang_shape_parameter_set = TRUE;
-            }
-	    if (strcmp(param_key, "urban_decimal_fraction") == 0) {
-	      model->direct_runoff_params_struct.urban_decimal_fraction = strtod(param_value, NULL);
-		is_urban_decimal_fraction_set = TRUE;
-	    }
+	/* Nash cascade based surface runoff */
+	if (strcmp(param_key, "surface_runoff_scheme") == 0) {
+	  if (strcmp(param_value, "GIUH")==0 || strcmp(param_value, "giuh")==0 || strcmp(param_value,"1")==0 )
+	    model->surface_runoff_scheme = GIUH;
+	  if (strcmp(param_value, "NASH_CASCADE")==0 || strcmp(param_value, "nash_cascade")==0 || strcmp(param_value,"2")==0)
+	    model->surface_runoff_scheme = NASH_CASCADE;
+	  is_surface_runoff_scheme_set = TRUE;
+	  continue;
         }
 
-	/* Ice fraction: if set to true and runoff scheme is Schaake, additional parameters are needed in the config file, 
-        *//////////////////////////////////////////////////////////////////////////////
-        if (strcmp(param_key, "is_sft_coupled") == 0) {
+	if (strcmp(param_key, "N_nash_surface") == 0) {
+	  model->nash_surface_params.N_nash = strtol(param_value, NULL,10);
+	  is_N_nash_surface_set             = TRUE;
+	  continue;
+        }
+        if (strcmp(param_key, "K_nash_surface") == 0) {
+	  model->nash_surface_params.K_nash = strtod(param_value, NULL);
+	  is_K_nash_surface_set             = TRUE;
+	  if ((param_units == NULL) || (strlen(param_units) < 1)) {
+	    Log(DEBUG, "[units] expected for '%s' in config file. [1/hour]\n", param_key);
+	  }
+	  continue;
+        }
+	if (strcmp(param_key, "nsubsteps_nash_surface") == 0) {
+	  model->nash_surface_params.nsubsteps = strtol(param_value, NULL, 10);
+	  is_nsubsteps_nash_surface_set        = TRUE;
+	  continue;
+        }
+        if (strcmp(param_key, "nash_storage_surface") == 0) {
+	  nash_storage_surface_string_val = strdup(param_value);
+	  is_nash_storage_surface_set     = TRUE;
+	  if ((param_units == NULL) || (strlen(param_units) < 1)) {
+        Log(WARNING, "[units] expected for '%s' in config file. [m]\n", param_key);
+	  }
+	  continue;
+        }
+        if (strcmp(param_key, "Kinf_nash_surface") == 0) {
+	  model->nash_surface_params.K_infiltration = strtod(param_value, NULL);
+	  is_K_infiltration_nash_surface_set = TRUE;
+	  if ((param_units == NULL) || (strlen(param_units) < 1)) {
+	   Log(WARNING, "[units] expected for '%s' in config file. [1/hour]\n", param_key);
+	  }
+	  continue;
+        }
+	if (strcmp(param_key, "retention_depth_nash_surface") == 0) {
+	  model->nash_surface_params.retention_depth = strtod(param_value, NULL);
+	  is_retention_depth_nash_surface_set        = TRUE;
+	  if ((param_units == NULL) || (strlen(param_units) < 1)) {
+        Log(WARNING, "[units] expected for '%s' in config file. [m]\n", param_key);
+	  }
+	  continue;
+        }
+
+
+	/*--------------------------------------------------------------------------*/
+	/* xinanjiang_dev: Need the option to run either runoff method in the config file,
+	 *//////////////////////////////////////////////////////////////////////////////
+	if (strcmp(param_key, "surface_water_partitioning_scheme") == 0 || strcmp(param_key, "surface_partitioning_scheme") == 0) {
+	  if (strcmp(param_value, "Schaake")==0 || strcmp(param_value, "schaake")==0 || strcmp(param_value,"1")==0 )
+	    model->infiltration_excess_params_struct.surface_water_partitioning_scheme = Schaake;
+	  if (strcmp(param_value, "Xinanjiang")==0 || strcmp(param_value, "xinanjiang")==0 || strcmp(param_value,"2")==0)
+	    model->infiltration_excess_params_struct.surface_water_partitioning_scheme = Xinanjiang;
+	  is_infiltration_excess_method_set = TRUE;
+
+	  if (strcmp(param_key, "surface_partitioning_scheme") == 0) {
+	    Log(WARNING, "The name \"surface_partitioning_scheme\" in the config file will be deprecated; use the new name \"surface_water_partitioning_scheme\" instead. \n");
+	  }
+	  continue;
+	}
+	if (model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Xinanjiang) {  //Check that logical statement is correct
+	  if (strcmp(param_key, "a_Xinanjiang_inflection_point_parameter") == 0){
+	    model->infiltration_excess_params_struct.a_Xinanjiang_inflection_point_parameter = strtod(param_value, NULL);
+	    is_a_Xinanjiang_inflection_point_parameter_set = TRUE;
+	  }
+	  if (strcmp(param_key, "b_Xinanjiang_shape_parameter") == 0) {
+	    model->infiltration_excess_params_struct.b_Xinanjiang_shape_parameter = strtod(param_value, NULL);
+	    is_b_Xinanjiang_shape_parameter_set = TRUE;
+	  }
+	  if (strcmp(param_key, "x_Xinanjiang_shape_parameter") == 0) {
+	    model->infiltration_excess_params_struct.x_Xinanjiang_shape_parameter = strtod(param_value, NULL);
+	    is_x_Xinanjiang_shape_parameter_set = TRUE;
+	  }
+	  if (strcmp(param_key, "urban_decimal_fraction") == 0) {
+	    model->infiltration_excess_params_struct.urban_decimal_fraction = strtod(param_value, NULL);
+	    is_urban_decimal_fraction_set = TRUE;
+	  }
+	}
+
+	/* Ice fraction: if set to true and runoff scheme is Schaake, additional parameters are needed in the config file,
+	 *//////////////////////////////////////////////////////////////////////////////
+	if (strcmp(param_key, "is_sft_coupled") == 0) {
 	  if ( strcmp(param_value, "true")==0 || strcmp(param_value, "True")==0 || strcmp(param_value,"1")==0)
 	    is_sft_coupled_set = TRUE;
 	  
 	  continue;
-        }
-
-	if (is_sft_coupled_set == TRUE && model->direct_runoff_params_struct.surface_partitioning_scheme == Schaake) {
+	}
+	
+	if (is_sft_coupled_set == TRUE && model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Schaake) {
 	  if (strcmp(param_key, "ice_content_threshold") == 0) {
-	    model->direct_runoff_params_struct.ice_content_threshold = strtod(param_value, NULL);
+	    model->infiltration_excess_params_struct.ice_content_threshold = strtod(param_value, NULL);
 	    is_ice_content_threshold_set = TRUE;
-	     // Check if units are present and print warning if missing from config file
+	    // Check if units are present and print warning if missing from config file
             if ((param_units == NULL) || (strlen(param_units) < 1)) {
-    	      Log(SEVERE, "[units] expected for '%s' in config file \n", param_key);
+    	      Log(WARNING, "[units] expected for '%s' in config file \n", param_key);
             }
 	  }
 	}
     }
 
     if (is_forcing_file_set == FALSE) {
-        Log(WARNING, "Config param 'forcing_file' not found in config file\n");
+        Log(SEVERE, "Config param 'forcing_file' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__depth_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.depth' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_params.depth' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__bb_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.bb' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_params.bb' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
 
     if (is_soil_params__satdk_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.satdk' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_params.satdk' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__satpsi_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.satpsi' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_params.satpsi' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__slop_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.slop' not found in config file\n");
+        Log(WARNING, "Config param 'soil_params.slop' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__smcmax_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.smcmax' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_params.smcmax' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__wltsmc_set == FALSE) {
-        Log(WARNING, "Config param 'soil_params.wltsmc' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_params.wltsmc' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_params__expon_set == FALSE) {
@@ -828,35 +927,35 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         //return BMI_FAILURE;
     }
     if (is_Cgw_set == FALSE) {
-        Log(WARNING, "Config param 'Cgw' not found in config file\n");
+        Log(SEVERE, "Config param 'Cgw' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_expon_set == FALSE) {
-        Log(WARNING, "Config param 'expon' not found in config file\n");
+        Log(WARNING, "Config param 'expon' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_alpha_fc_set == FALSE) {
-        Log(WARNING, "Config param 'alpha_fc' not found in config file\n");
+        Log(SEVERE, "Config param 'alpha_fc' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_soil_storage_set == FALSE) {
-        Log(WARNING, "Config param 'soil_storage' not found in config file\n");
+        Log(SEVERE, "Config param 'soil_storage' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_K_nash_set == FALSE) {
-        Log(WARNING, "Config param 'K_nash' not found in config file\n");
+        Log(SEVERE, "Config param 'K_nash' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_K_lf_set == FALSE) {
-        Log(WARNING, "Config param 'K_lf' not found in config file\n");
+        Log(SEVERE, "Config param 'K_lf' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_gw_max_set == FALSE) {
-        Log(WARNING, "Config param 'max_gw_storage' not found in config file\n");
+        Log(SEVERE, "Config param 'max_gw_storage' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_gw_storage_set == FALSE) {
-        Log(WARNING, "Config param 'gw_storage' not found in config file\n");
+        Log(SEVERE, "Config param 'gw_storage' not found in config file\. Aborting...n");
         return BMI_FAILURE;
     }
     
@@ -866,35 +965,34 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     }
 
     if (is_num_timesteps_set == FALSE && strcmp(model->forcing_file, "BMI")) {
-        Log(WARNING, "Config param 'num_timesteps' not found in config file\n");
+        Log(SEVERE, "Config param 'num_timesteps' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     if (is_verbosity_set == FALSE) {
         Log(WARNING, "Config param 'verbosity' not found in config file\n");
-        Log(WARNING, "setting verbosity to a high value\n");
-        model->verbosity = 10;
-        return BMI_FAILURE;
+        Log(WARNING, "setting verbosity to a low value\n");
+        model->verbosity = 0;
     }
-    if (is_direct_runoff_method_set == FALSE) {
-        Log(WARNING, "Config param 'direct_runoff_method' not found in config file\n");
+    if (is_infiltration_excess_method_set == FALSE) {
+        Log(WARNING, "Config param 'infiltration_excess_method' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
 /* xinanjiang_dev*/
-    if(model->direct_runoff_params_struct.surface_partitioning_scheme == Xinanjiang){
+    if(model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Xinanjiang){
         if (is_a_Xinanjiang_inflection_point_parameter_set == FALSE) {
-            Log(WARNING, "Config param 'a_Xinanjiang_inflection_point_parameter' not found in config file\n");
+            Log(SEVERE, "Config param 'a_Xinanjiang_inflection_point_parameter' not found in config file. Aborting...\n");
             return BMI_FAILURE;
         }
         if (is_b_Xinanjiang_shape_parameter_set == FALSE) {
-            Log(WARNING, "Config param 'b_Xinanjiang_shape_parameter' not found in config file\n");
+            Log(SEVERE, "Config param 'b_Xinanjiang_shape_parameter' not found in config file. Aborting...\n");
             return BMI_FAILURE;
         }
         if (is_x_Xinanjiang_shape_parameter_set == FALSE) {
-            Log(WARNING, "Config param 'x_Xinanjiang_shape_parameter' not found in config file\n");
+            Log(SEVERE, "Config param 'x_Xinanjiang_shape_parameter' not found in config file. Aborting...\n");
             return BMI_FAILURE;
         }
 	    if (is_urban_decimal_fraction_set == FALSE) {
-	    Log(WARNING, "Config param 'urban_decimal_fraction' not found in config file\n");
+	    Log(SEVERE, "Config param 'urban_decimal_fraction' not found in config file. Aborting...\n");
 	    return BMI_FAILURE;
 	    }  
     }
@@ -904,8 +1002,114 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         Log(INFO, "Schaake Magic Constant calculated\n");
     }
     
-    if (is_sft_coupled_set == TRUE && model->direct_runoff_params_struct.surface_partitioning_scheme == Schaake) {
+    model->num_giuh_ordinates = 0; // initialize num_giuh_ordinates 
+    
+    // Used for parsing strings representing arrays of values below
+    char *copy, *value;
+    
+    if (model->surface_runoff_scheme == GIUH) {
+      
+      // Handle GIUH ordinates, bailing if they were not provided
+      if (is_giuh_originates_string_val_set == FALSE) {
+        Log(SEVERE, "GIUH ordinate string not set! Aborting...\n");
+        return BMI_FAILURE;
+      }
+      Log(INFO, "GIUH ordinates string value found in config ('%s')\n", giuh_originates_string_val);
+      
+      model->num_giuh_ordinates = count_delimited_values(giuh_originates_string_val, ",");
+      
+      Log(INFO, "Counted number of GIUH ordinates (%d)\n", model->num_giuh_ordinates);
+      
+      if (model->num_giuh_ordinates < 1) {
+        Log(SEVERE, ("Number of GIUH ordinates less than 1 (%d). Aborting... \n", model->num_giuh_ordinates);
+        return BMI_FAILURE;
+      }
+      
+      model->giuh_ordinates = malloc(sizeof(double) * model->num_giuh_ordinates);
+      // Work with a copy of the original pointer so that the original remains unchanged and can be freed at end
+      copy = giuh_originates_string_val;
+      // Now iterate back through and get the values
+      int i = 0;
+      while ((value = strsep(&copy, ",")) != NULL)
+        model->giuh_ordinates[i++] = strtod(value, NULL);
+      // Finally, free the original string memory
+      free(giuh_originates_string_val);
+      
+      //NJF Be explicit that nash_storage in this case is NULL
+      model->nash_surface_params.nash_storage = NULL;
+    }
+    else if(model->surface_runoff_scheme == NASH_CASCADE) {
+      if (is_N_nash_surface_set == FALSE) {
+      Log(SEVERE, "Config param 'N_nash_surface' not found in config file. Aborting...\n");
+	return BMI_FAILURE;
+      }
+      if (is_K_nash_surface_set == FALSE) {
+      Log(SEVERE, "Config param 'K_nash_surface' not found in config file. Aborting...\n");
+	return BMI_FAILURE;
+      }
+      if (is_nsubsteps_nash_surface_set == FALSE) {
+        Log(INFO, "Config param 'nsubsteps_nash_surface' not found in config file, default value is 10.\n");
+	    model->nash_surface_params.nsubsteps = 10;      // default value of the number of sub-timesteps  
+      }
+      if (is_nash_storage_surface_set == FALSE) {
+      Log(SEVERE, "Config param 'nash_storage_surface' not found in config file. Aborting...\n");
+	return BMI_FAILURE;
+      }
+      if (is_K_infiltration_nash_surface_set == FALSE) {
+#if CFE_DEBUG >= 1
+	printf("Config param 'Kinf_nash_surface' not found in config file, default value is 0.001 [1/hr] \n");
+#endif
+	model->nash_surface_params.K_infiltration  = 0.001;   // used in the runon infiltration
+      }
+      if (is_retention_depth_nash_surface_set == FALSE) {
+#if CFE_DEBUG >= 1
+	printf("Config param 'retention_depth_nash_surface' not found in config file, default value is 1.0 [mm] \n");
+#endif
+	model->nash_surface_params.retention_depth = 0.001;  // usually in the range of 1-5 mm
+      }
+      
+      
+      // Now handle the Nash storage array properly
+      // First, when there are values, read how many there are, and have that override any set count value
+      int value_count = count_delimited_values(nash_storage_surface_string_val, ",");
+      
+      assert (value_count == model->nash_surface_params.N_nash);
+      
+      if (value_count > 2) {
+        model->nash_surface_params.nash_storage = malloc(sizeof(double) * value_count);
+        // Work with a copy of the original pointer so that the original remains unchanged and can be freed at end
+        copy = nash_storage_surface_string_val;
+        // Now iterate back through and get the values
+        int k = 0;
+        while ((value = strsep(&copy, ",")) != NULL)
+          model->nash_surface_params.nash_storage[k++] = strtod(value, NULL);
+	
+        // Make sure at the end to free this too, since it was a copy
+        free(nash_storage_surface_string_val);
+      }
+      else {
+        // If Nash storage values weren't set, initialize them to 0.0
+        model->nash_surface_params.nash_storage = malloc(sizeof(double) * model->nash_surface_params.N_nash);
+        for (j = 0; j < model->nash_surface_params.N_nash; j++)
+          model->nash_surface_params.nash_storage[j] = 0.0;
+      }
+      
+      
+      // initialize default parameters
+    }
 
+    /*------------------- surface runoff scheme END ----------------------------- */
+
+    if(model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Schaake) {
+      model->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = model->NWM_soil_params.refkdt * model->NWM_soil_params.satdk / 0.000002;
+
+#if CFE_DEBUG >= 1
+      printf("Schaake Magic Constant calculated\n");
+#endif
+    }
+    
+    if (is_sft_coupled_set == TRUE && model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Schaake) {
+      
       if(!is_ice_content_threshold_set) {
 	    Log(FATAL, "is_sft_coupled and Schaake scheme are set to TRUE but param 'ice_fraction_threshold' not found in config file\n");
 	    exit(-9);
@@ -962,10 +1166,10 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 // Calculate the thickness (delta) of each soil layer
     if (is_aet_rootzone_set == TRUE ) {
       model->soil_reservoir.is_aet_rootzone = TRUE;
-      model->soil_reservoir.delta_soil_layer_depth_m = malloc(sizeof(double) * (model->soil_reservoir.n_soil_layers + 1));
+      model->soil_reservoir.delta_soil_layer_depth_m = malloc(sizeof(double) * (model->soil_reservoir.n_soil_layers));
       double previous_depth = 0;
       double current_depth = 0;
-      for (int i=1; i <= model->soil_reservoir.n_soil_layers; i++) {
+      for (int i=0; i <model->soil_reservoir.n_soil_layers; i++) {
         current_depth = model->soil_reservoir.soil_layer_depths_m[i];
         if (current_depth <= previous_depth)
 	        Log(SEVERE, "Soil depths may be out of order.  One or more soil layer depths is less than or equal to the previous layer. Check CFE config file.\n");
@@ -980,64 +1184,43 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     }
     else {
       model->soil_reservoir.is_aet_rootzone = FALSE;
-      model->soil_reservoir.n_soil_layers   = 0;
+      model->soil_reservoir.n_soil_layers   = 1;
     }
 
     /*--------------------END OF ROOT ZONE ADJUSTED AET DEVELOPMENT -rlm ------------------------------*/
-     
+
     Log(INFO, "All CFE config params present\n");
 
-    // Handle GIUH ordinates, bailing if they were not provided
-    if (is_giuh_originates_string_val_set == FALSE) {
-        Log(WARNING, "GIUH ordinate string not set!\n");
-        return BMI_FAILURE;
-    }
-    Log(INFO, "GIUH ordinates string value found in config ('%s')\n", giuh_originates_string_val);
-    model->num_giuh_ordinates = count_delimited_values(giuh_originates_string_val, ",");
-    Log(INFO, "Counted number of GIUH ordinates (%d)\n", model->num_giuh_ordinates);
-    if (model->num_giuh_ordinates < 1)
-        return BMI_FAILURE;
-
-    model->giuh_ordinates = malloc(sizeof(double) * model->num_giuh_ordinates);
-    // Work with copy of the string pointer to make sure the original pointer remains unchanged, so mem can be freed at end
-    copy = giuh_originates_string_val;
-    // Now iterate back through and get the values (this modifies the string, which is why we needed the full string copy above)
-    int i = 0;
-    while ((value = strsep(&copy, ",")) != NULL)
-        model->giuh_ordinates[i++] = strtod(value, NULL);
-    // Finally, free the original string memory
-    free(giuh_originates_string_val);
-
-    // Now handle the Nash storage array properly
-    if (is_nash_storage_string_val_set == TRUE) {
+    // Now handle the Nash storage array properly (Nash Cascade for subsurface)
+    if (is_nash_storage_subsurface_string_val_set == TRUE) {
         // First, when there are values, read how many there are, and have that override any set count value
-        int value_count = count_delimited_values(nash_storage_string_val, ",");
+        int value_count = count_delimited_values(nash_storage_subsurface_string_val, ",");
         // TODO: consider adding a warning if value_count and N_nash (assuming it was read from the config and not default) disagree
         // Ignore the values if there are not enough, and use whatever was set, or defaults
         if (value_count < 2) {
-            
-            model->nash_storage = malloc(sizeof(double) * model->N_nash);
-            for (j = 0; j < model->N_nash; j++)
-                model->nash_storage[j] = 0.0;
+
+            model->nash_storage_subsurface = malloc(sizeof(double) * model->N_nash_subsurface);
+            for (j = 0; j < model->N_nash_subsurface; j++)
+                model->nash_storage_subsurface[j] = 0.0;
         }
         else {
-            model->N_nash = value_count;
-            model->nash_storage = malloc(sizeof(double) * value_count);
-            // Work with copy the string pointer to make sure the original remains unchanged, so it can be freed at end
-            copy = nash_storage_string_val;
+            model->N_nash_subsurface = value_count;
+            model->nash_storage_subsurface = malloc(sizeof(double) * value_count);
+	    // Work with a copy of the original pointer so that the original remains unchanged and can be freed at end
+            copy = nash_storage_subsurface_string_val;
             // Now iterate back through and get the values
             int k = 0;
             while ((value = strsep(&copy, ",")) != NULL)
-                model->nash_storage[k++] = strtod(value, NULL);
+                model->nash_storage_subsurface[k++] = strtod(value, NULL);
         }
         // Make sure at the end to free this too, since it was a copy
-        free(nash_storage_string_val);
+        free(nash_storage_subsurface_string_val);
     }
     // If Nash storage values weren't set, initialize them to 0.0
     else {
-        model->nash_storage = malloc(sizeof(double) * model->N_nash);
-        for (j = 0; j < model->N_nash; j++)
-            model->nash_storage[j] = 0.0;
+        model->nash_storage_subsurface = malloc(sizeof(double) * model->N_nash_subsurface);
+        for (j = 0; j < model->N_nash_subsurface; j++)
+            model->nash_storage_subsurface[j] = 0.0;
     }
     fclose(fp);
     Log(DEBUG, "Finished function parsing CFE config\n");
@@ -1090,16 +1273,15 @@ static int Initialize (Bmi *self, const char *file)
     ************************************************************************/
 
     /* xinanjiang_dev
-        changing the name to the more general "direct runoff"
-    cfe_bmi_data_ptr->flux_Schaake_output_runoff_m = malloc(sizeof(double));*/
-    cfe_bmi_data_ptr->flux_output_direct_runoff_m  = malloc(sizeof(double));
-    *cfe_bmi_data_ptr->flux_output_direct_runoff_m = 0.0;
+        changing the name to the more suitable "infiltration excess"*/
+    cfe_bmi_data_ptr->infiltration_excess_m  = malloc(sizeof(double));
+    *cfe_bmi_data_ptr->infiltration_excess_m = 0.0;
     cfe_bmi_data_ptr->flux_Qout_m = malloc(sizeof(double));
     *cfe_bmi_data_ptr->flux_Qout_m = 0.0;
     cfe_bmi_data_ptr->flux_from_deep_gw_to_chan_m = malloc(sizeof(double));
     *cfe_bmi_data_ptr->flux_from_deep_gw_to_chan_m = 0.0;
-    cfe_bmi_data_ptr->flux_giuh_runoff_m = malloc(sizeof(double));
-    *cfe_bmi_data_ptr->flux_giuh_runoff_m = 0.0;
+    cfe_bmi_data_ptr->flux_direct_runoff_m = malloc(sizeof(double));
+    *cfe_bmi_data_ptr->flux_direct_runoff_m = 0.0;
     cfe_bmi_data_ptr->flux_lat_m = malloc(sizeof(double));
     *cfe_bmi_data_ptr->flux_lat_m = 0.0;
     cfe_bmi_data_ptr->flux_nash_lateral_runoff_m = malloc(sizeof(double));
@@ -1219,7 +1401,7 @@ static int Initialize (Bmi *self, const char *file)
     cfe_bmi_data_ptr->soil_reservoir.ice_fraction_xinanjiang = 0.0;
 
     if (cfe_bmi_data_ptr->soil_reservoir.is_aet_rootzone == TRUE)
-      cfe_bmi_data_ptr->soil_reservoir.smc_profile = malloc(sizeof(double)*cfe_bmi_data_ptr->soil_reservoir.n_soil_layers + 1);
+      cfe_bmi_data_ptr->soil_reservoir.smc_profile = malloc(sizeof(double)*cfe_bmi_data_ptr->soil_reservoir.n_soil_layers);
     else
       cfe_bmi_data_ptr->soil_reservoir.smc_profile = malloc(sizeof(double)*1);
     
@@ -1266,6 +1448,17 @@ static int Update (Bmi *self)
     // Advance the model time 
     cfe_ptr->current_time_step += 1;
 
+    // compute NWM ponded depth, which is assumed to be the leftover water in the GIUH/NASH queue
+    cfe_ptr->nwm_ponded_depth_m = 0.0;
+    if (cfe_ptr->surface_runoff_scheme == GIUH) {
+      for(i=0;i<cfe_ptr->num_giuh_ordinates;i++)
+	cfe_ptr->nwm_ponded_depth_m += cfe_ptr->runoff_queue_m_per_timestep[i];
+    }
+    else if (cfe_ptr->surface_runoff_scheme == NASH_CASCADE) {
+      for(i=0;i<cfe_ptr->nash_surface_params.N_nash;i++)
+	cfe_ptr->nwm_ponded_depth_m += cfe_ptr->nash_surface_params.nash_storage[i];
+    }
+
     return BMI_SUCCESS;
 }
 
@@ -1280,11 +1473,15 @@ static int Update_until (Bmi *self, double t)
     double dt;
     double now;
 
-    if(self->get_time_step (self, &dt) == BMI_FAILURE)
+    if(self->get_time_step (self, &dt) == BMI_FAILURE) {
+        Log(SEVERE, "get_time_step failure. Aborting...\n");
         return BMI_FAILURE;
+    }
 
-    if(self->get_current_time(self, &now) == BMI_FAILURE)
-        return BMI_FAILURE;    
+    if(self->get_current_time(self, &now) == BMI_FAILURE) {
+        Log(SEVERE, "get_current_time failure. Aborting...\
+        return BMI_FAILURE;
+        }
 
     {
     
@@ -1314,23 +1511,6 @@ static int Update_until (Bmi *self, double t)
 }
 
 
-//    cfe_state_struct* cfe_ptr = ((cfe_state_struct *) self->data);
-//    
-//    int t_int = (int) t;
-//    if ((t - ((double)t_int)) != 0)
-//        return BMI_FAILURE;
-//
-//    for (int j = 0; j < t_int; j++){
-//
-//        self->update(self); 
-//        if (cfe_ptr->verbosity > 1)
-//            print_cfe_flux_at_timestep(cfe_ptr);
-//
-//    }
-//    return BMI_SUCCESS;
-//}
-
-
 static int Finalize (Bmi *self)
 {
     // Function assumes everything that is needed is retrieved from the model before Finalize is called.
@@ -1344,8 +1524,8 @@ static int Finalize (Bmi *self)
         
         if( model->giuh_ordinates != NULL )
             free(model->giuh_ordinates);
-        if( model->nash_storage != NULL )
-            free(model->nash_storage);
+        if( model->nash_storage_subsurface != NULL )
+            free(model->nash_storage_subsurface);
         if( model->runoff_queue_m_per_timestep != NULL )
             free(model->runoff_queue_m_per_timestep);
         if( model->flux_Qout_m != NULL )
@@ -1354,13 +1534,13 @@ static int Finalize (Bmi *self)
         /* xinanjiang_dev: changing name to the more general "direct runoff"
         if( model->flux_Schaake_output_runoff_m != NULL )
             free(model->flux_Schaake_output_runoff_m);*/
-        if( model->flux_output_direct_runoff_m != NULL )
-            free(model->flux_output_direct_runoff_m);
+        if( model->infiltration_excess_m != NULL )
+            free(model->infiltration_excess_m);
 
         if( model->flux_from_deep_gw_to_chan_m != NULL )
             free(model->flux_from_deep_gw_to_chan_m);
-        if( model->flux_giuh_runoff_m != NULL )
-            free(model->flux_giuh_runoff_m);
+        if( model->flux_direct_runoff_m != NULL )
+            free(model->flux_direct_runoff_m);
         if( model->flux_lat_m != NULL )
             free(model->flux_lat_m);
         if( model->flux_nash_lateral_runoff_m != NULL )
@@ -1395,7 +1575,7 @@ static int Get_adjusted_index_for_variable(const char *name)
     if (strcmp(name, param_var_names[i]) == 0)
         return i + INPUT_VAR_NAME_COUNT + OUTPUT_VAR_NAME_COUNT;
     }
-
+    Log(SEVERE, "adjusted index for variable not found. Aborting...\n");
     return -1;
 }
 
@@ -1418,7 +1598,7 @@ static int Get_var_grid(Bmi *self, const char *name, int *grid)
     }
     // If we get here, it means the variable name wasn't recognized
     grid[0] = '\0';
-    
+    Log(SEVERE, "grid variable name wasn't recognized. Aborting...\n");   
     return BMI_FAILURE;
 }
 
@@ -1449,8 +1629,9 @@ static int Get_var_type (Bmi *self, const char *name, char * type)
         }
     }
 
-    // If we get here, it means the variable name wasn't recognized
+    // If we get here, it means the variable type wasn't recognized
     type[0] = '\0';
+    Log(SEVERE, "variable type wasn't recognized. Aborting...\n");   
     return BMI_FAILURE;
 }
 
@@ -1487,6 +1668,7 @@ static int Get_var_itemsize (Bmi *self, const char *name, int * size)
     }
     else {
         *size = 0;
+        Log(SEVERE, "variable itemsize wasn't recognized. Aborting...\n");   
         return BMI_FAILURE;
     }
 }
@@ -1508,8 +1690,9 @@ static int Get_var_location (Bmi *self, const char *name, char * location)
             return BMI_SUCCESS;
         }
     }
-    // If we get here, it means the variable name wasn't recognized
+    // If we get here, it means the variable name location wasn't recognized
     location[0] = '\0';
+    Log(SEVERE, "variable name location wasn't recognized. Aborting...\n");   
     return BMI_FAILURE;
 }
 
@@ -1536,7 +1719,6 @@ static int Get_var_units (Bmi *self, const char *name, char * units)
     return BMI_FAILURE;
 }
 
-
 static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
 {
     int item_size;
@@ -1548,6 +1730,10 @@ static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
     for (i = 0; i < INPUT_VAR_NAME_COUNT; i++) {
         if (strcmp(name, input_var_names[i]) == 0) {
             item_count = input_var_item_count[i];
+	    if (strcmp(name, "soil_moisture_profile") == 0) {
+	      cfe_state_struct *cfe_ptr;
+	      item_count = ((cfe_state_struct *)(self->data))->soil_reservoir.n_soil_layers;
+	    }
             break;
         }
     }
@@ -1559,10 +1745,19 @@ static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
             }
         }
     }
+    if (item_count < 1) {
+      for (i = 0; i < PARAM_VAR_NAME_COUNT; i++) {
+        if (strcmp(name, param_var_names[i]) == 0) {
+	  item_count = 1; // all of the calibratable parameters are (and will be?) scalars - AJK
+	  break;
+        }
+      }
+    }
     if (item_count < 1)
         item_count = ((cfe_state_struct *) self->data)->num_timesteps;
 
     *nbytes = item_size * item_count;
+
     return BMI_SUCCESS;
 }
 
@@ -1570,9 +1765,6 @@ static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
 static int Get_value_ptr (Bmi *self, const char *name, void **dest)
 {
 
-     
-
-    
     /*********** Calibration Params Hacked ************/
     if (strcmp (name, "maxsmc") == 0) {
         cfe_state_struct *cfe_ptr;
@@ -1598,14 +1790,7 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
         *dest = (void*)&cfe_ptr->NWM_soil_params.bb;
         return BMI_SUCCESS;
     }
-    //
-    //if (strcmp (name, "multiplier") == 0) {
-    //    cfe_state_struct *cfe_ptr;
-    //    cfe_ptr = (cfe_state_struct *) self->data;
-    //    *dest = (void*)&cfe_ptr->NWM_soil_params.mult;
-    //    return BMI_SUCCESS;
-    //}
-    
+
     if (strcmp (name, "Klf") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
@@ -1619,7 +1804,7 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
     if (strcmp (name, "Kn") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->K_nash;
+        *dest = (void*)&cfe_ptr->K_nash_subsurface;
         return BMI_SUCCESS;
     }
     if (strcmp (name, "Cgw") == 0) {
@@ -1641,16 +1826,7 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
         *dest = (void*)&cfe_ptr->gw_reservoir.storage_max_m;
         return BMI_SUCCESS;
     }
-/**********Parameter Derived from config file - root zone adjusted AET development - rlm ***********/
-    if (strcmp (name, "soil__num_cells") == 0) {
-        cfe_state_struct *cfe_ptr;
-        cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->soil_reservoir.n_soil_layers;
-        return BMI_SUCCESS;
-    }
 
-/**************************************************************************************************/
-    
     if (strcmp (name, "satpsi") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
@@ -1680,49 +1856,54 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
      if (strcmp (name, "a_Xinanjiang_inflection_point_parameter") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->direct_runoff_params_struct.a_Xinanjiang_inflection_point_parameter;
+        *dest = (void*)&cfe_ptr->infiltration_excess_params_struct.a_Xinanjiang_inflection_point_parameter;
         return BMI_SUCCESS;
     }  
 
      if (strcmp (name, "b_Xinanjiang_shape_parameter") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->direct_runoff_params_struct.b_Xinanjiang_shape_parameter;
+        *dest = (void*)&cfe_ptr->infiltration_excess_params_struct.b_Xinanjiang_shape_parameter;
         return BMI_SUCCESS;
     }  
 
      if (strcmp (name, "x_Xinanjiang_shape_parameter") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->direct_runoff_params_struct.x_Xinanjiang_shape_parameter;
-        return BMI_SUCCESS;
-    } 
-             
-     if (strcmp (name, "N_nash") == 0) {
-        cfe_state_struct *cfe_ptr;
-        cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->N_nash;
+        *dest = (void*)&cfe_ptr->infiltration_excess_params_struct.x_Xinanjiang_shape_parameter;
         return BMI_SUCCESS;
     }
-              
-    
+
+    if (strcmp (name, "Kinf_nash_surface") == 0) {
+        cfe_state_struct *cfe_ptr;
+        cfe_ptr = (cfe_state_struct *) self->data;
+        *dest = (void*)&cfe_ptr->nash_surface_params.K_infiltration;
+        return BMI_SUCCESS;
+    }
+
+    if (strcmp(name, "retention_depth_nash_surface") == 0) {
+        cfe_state_struct *cfe_ptr;
+        cfe_ptr = (cfe_state_struct *) self->data;
+        *dest = (void*)&cfe_ptr->nash_surface_params.retention_depth;
+        return BMI_SUCCESS;
+    }
     /***********************************************************/
     /***********    OUTPUT   ***********************************/
     /***********************************************************/
     if (strcmp (name, "RAIN_RATE") == 0) {   //jmframe: Seems unnecessary to have rain rate as an output variable.
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
-        *dest = (void*)&cfe_ptr->aorc.precip_kg_per_m2;
+        *dest = (void*)&cfe_ptr->timestep_rainfall_input_m;
         return BMI_SUCCESS;
     }
 
-    if (strcmp (name, "DIRECT_RUNOFF") == 0) {
-        *dest = (void*) ((cfe_state_struct *)(self->data))->flux_output_direct_runoff_m;
+    if (strcmp (name, "INFILTRATION_EXCESS") == 0) {
+        *dest = (void*) ((cfe_state_struct *)(self->data))->infiltration_excess_m;
         return BMI_SUCCESS;
     }
 
-    if (strcmp (name, "GIUH_RUNOFF") == 0) {
-        *dest = (void *) ((cfe_state_struct *)(self->data))->flux_giuh_runoff_m;
+    if (strcmp (name, "GIUH_RUNOFF") == 0 || strcmp (name, "DIRECT_RUNOFF") == 0) {
+        *dest = (void *) ((cfe_state_struct *)(self->data))->flux_direct_runoff_m;
         return BMI_SUCCESS;
     }
 
@@ -1787,8 +1968,13 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
       *dest = (void*)&cfe_ptr->direct_runoff_params_struct.surface_partitioning_scheme;
       return BMI_SUCCESS;
     }
-    
 
+    if (strcmp (name, "NWM_PONDED_DEPTH") == 0) {
+      cfe_state_struct *cfe_ptr;
+      cfe_ptr = (cfe_state_struct *) self->data;
+      *dest = (void*)&cfe_ptr->nwm_ponded_depth_m;
+      return BMI_SUCCESS;
+    }
     /***********************************************************/
     /***********    INPUT    ***********************************/
     /***********************************************************/
@@ -1818,7 +2004,9 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
         return BMI_SUCCESS;
     }
 
-//--------------Root zone adjusted AET development -rlm -ajk -------
+    /**************************************************************************************************/
+    /**********Parameter Derived from config file - root zone adjusted AET development - rlm -ajk ***********/
+
     if (strcmp (name, "soil_moisture_profile") == 0) {
       *dest = (void *) ((cfe_state_struct *)(self->data))->soil_reservoir.smc_profile;
       return BMI_SUCCESS;
@@ -1873,93 +2061,38 @@ static int Get_value (Bmi *self, const char *name, void *dest)
     return Get_value_at_indices(self, name, dest, inds, 1);
 }
 
-
 static int Set_value_at_indices (Bmi *self, const char *name, int * inds, int len, void *src)
 {
-    if (len < 1)
-        return BMI_FAILURE;
-    
-    // Get "adjusted_index" for variable
-    int adjusted_index = Get_adjusted_index_for_variable(name);
-    if (adjusted_index < 0)
+    void * dest  = NULL;
+    int itemsize = 0;
+
+    if (self->get_value_ptr(self, name, &dest) == BMI_FAILURE)
         return BMI_FAILURE;
 
-    int var_item_size;
-    int status = Get_var_itemsize(self, name, &var_item_size);
-    if (status == BMI_FAILURE)
+    if (self->get_var_itemsize(self, name, &itemsize) == BMI_FAILURE)
         return BMI_FAILURE;
 
-    // For now, all variables are non-array scalar values, with only 1 item of type double
-
-    // Thus, there is only ever one value to return (len must be 1) and it must always be from index 0
-    // ajk: modifying it to work with soil moisture column for rootzone depth based AET
-    if (strcmp(name, "soil_moisture_profile") == 0 || strcmp(name, "soil_layer_depths_m") == 0) { //Adding soil layer depths since they will be needed for root zone adjusted AET estimations -rlm
-      
-      len = ((cfe_state_struct *)(self->data))->soil_reservoir.n_soil_layers + 1;
-      void *ptr = NULL; //(double*) malloc (sizeof (double)* len);
-      status = Get_value_ptr(self, name, &ptr);
-      
-
-      if (status == BMI_FAILURE)
-        return BMI_FAILURE;
-      
-      memcpy(ptr, src, var_item_size * len);
-      
-      return BMI_SUCCESS;
-
+    size_t i;
+    size_t offset;
+    char * ptr;
+    // iterate over the source pointer, src, by itemsize byte chunks
+    // and set the destination pointer, dest, to the value in src 
+    // based on the linear offset provided by inds[i]
+    for (i=0, ptr=(char*)src; i<len; i++, ptr+=itemsize) {
+      offset = inds[i] * itemsize;
+      memcpy ((char*)dest + offset, ptr, itemsize);
     }
-    else if (len > 1 || inds[0] != 0)
-        return BMI_FAILURE;
 
-    void* ptr;
-    status = Get_value_ptr(self, name, &ptr);
-    if (status == BMI_FAILURE)
-        return BMI_FAILURE;
-    memcpy(ptr, src, var_item_size * len);
-    
-    if (strcmp (name, "maxsmc") == 0 || strcmp (name, "alpha_fc") == 0 || strcmp (name, "wltsmc") == 0 || strcmp (name, "maxsmc") == 0 || strcmp (name, "b") == 0 || strcmp (name, "slope") == 0 || strcmp (name, "satpsi") == 0 || strcmp (name, "Klf") == 0  || strcmp (name, "satdk") == 0){
-    
-        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-        init_soil_reservoir(cfe_ptr); 
-    }    
-    if (strcmp (name, "refkdt") == 0 || strcmp (name, "satdk") == 0){
-        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-        cfe_ptr->direct_runoff_params_struct.Schaake_adjusted_magic_constant_by_soil_type = cfe_ptr->NWM_soil_params.refkdt * cfe_ptr->NWM_soil_params.satdk / 0.000002;
-    } 
-
-    if (strcmp (name, "N_nash") == 0) {
-        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-        if( cfe_ptr->nash_storage != NULL ) free(cfe_ptr->nash_storage);
-    	cfe_ptr->nash_storage = malloc(sizeof(double) * cfe_ptr->N_nash);
-    	if( cfe_ptr->nash_storage == NULL ) return BMI_FAILURE;
-    	for (j = 0; j < cfe_ptr->N_nash; j++)
-        	cfe_ptr->nash_storage[j] = 0.0;    
-    } 
-
-    if (strcmp (name, "storage_max_m") == 0) {
-         cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-         cfe_ptr->gw_reservoir.storage_m = cfe_ptr->gw_reservoir.gw_storage * cfe_ptr->gw_reservoir.storage_max_m;
-     }   
-        
     return BMI_SUCCESS;
+
 }
 
 
-static int Set_value (Bmi *self, const char *name, void *array)
+static int Set_value (Bmi *self, const char *name, void *src)
 {
-    // Avoid using set value, call instead set_value_at_index
-    // Use nested call to "by index" version
 
-    // Here, for now at least, we know all the variables are scalar, so
-    int inds[] = {0};
-
-    // Then we can just ...
-    return Set_value_at_indices(self, name, inds, 1, array);
-    
-    
-/*  This is the sample code from read the docs
     void * dest = NULL;
-    int nbytes = 0;
+    int nbytes  = 0;
 
     if (self->get_value_ptr(self, name, &dest) == BMI_FAILURE)
         return BMI_FAILURE;
@@ -1967,10 +2100,25 @@ static int Set_value (Bmi *self, const char *name, void *array)
     if (self->get_var_nbytes(self, name, &nbytes) == BMI_FAILURE)
         return BMI_FAILURE;
 
-    memcpy (dest, array, nbytes);
+    memcpy (dest, src, nbytes);
 
+    if (strcmp (name, "maxsmc") == 0 || strcmp (name, "alpha_fc") == 0 || strcmp (name, "wltsmc") == 0 || strcmp (name, "maxsmc") == 0 || strcmp (name, "b") == 0 || strcmp (name, "slope") == 0 || strcmp (name, "satpsi") == 0 || strcmp (name, "Klf") == 0  || strcmp (name, "satdk") == 0){
+
+        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
+        init_soil_reservoir(cfe_ptr);
+    }
+    if (strcmp (name, "refkdt") == 0 || strcmp (name, "satdk") == 0){
+        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
+        cfe_ptr->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = cfe_ptr->NWM_soil_params.refkdt * cfe_ptr->NWM_soil_params.satdk / 0.000002;
+
+    }
+
+    if (strcmp (name, "storage_max_m") == 0) {
+         cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
+         cfe_ptr->gw_reservoir.storage_m = cfe_ptr->gw_reservoir.gw_storage * cfe_ptr->gw_reservoir.storage_max_m;
+     }
+    
     return BMI_SUCCESS;
-*/    
 }
 
 
@@ -2018,7 +2166,7 @@ static int Get_output_var_names (Bmi *self, char ** names)
 // ***********************************************************
 static int Get_state_var_count (Bmi *self, int * count)
 {
-    if (!self){
+    if (!self) {
         return BMI_FAILURE;
     }
 
@@ -2039,8 +2187,8 @@ static int Get_state_var_names (Bmi *self, char ** names)
     // These names can simply be internal vs. standard
     // names because they are not used for coupling.
     //---------------------------------------------------
-    if (!self){
-        return BMI_FAILURE;   
+    if (!self) {
+        return BMI_FAILURE;
     }
 
     int n_state_vars = STATE_VAR_NAME_COUNT;
@@ -2074,8 +2222,8 @@ static int Get_state_var_types (Bmi *self, char ** types)
     // Later, bmi.get_var_type() may be extended to
     // get more than input & output variable types.
     //---------------------------------------------------
-    if (!self){
-        return BMI_FAILURE;   
+    if (!self) {
+        return BMI_FAILURE;
     }
 
     int n_state_vars = STATE_VAR_NAME_COUNT;   
@@ -2124,9 +2272,7 @@ static int Get_state_var_sizes (Bmi *self, unsigned int size_list[])
     //---------------------------------------------------
     unsigned int ff_len = strlen( state->forcing_file );  //##############
     unsigned int num_giuh = state->num_giuh_ordinates + 1;
-    unsigned int num_lat_flow = state->N_nash + 1;
-    // unsigned int num_giuh = state->num_giuh_ordinates;
-    // unsigned int num_lat_flow = state->N_nash;
+    unsigned int num_lat_flow = state->N_nash_subsurface + 1;
 
     //-------------------------------------------------
     // Overwrite the sizes that are not 1 (now known)
@@ -2226,8 +2372,8 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
     ptr_list[42] = &(state->vol_struct.volstart );
     ptr_list[43] = &(state->vol_struct.volout );
     ptr_list[44] = &(state->vol_struct.volin );
-    ptr_list[45] = &(state->vol_struct.vol_from_gw ); 
-    ptr_list[46] = &(state->vol_struct.vol_out_giuh );
+    ptr_list[45] = &(state->vol_struct.vol_from_gw );
+    ptr_list[46] = &(state->vol_struct.vol_out_surface );
     ptr_list[47] = &(state->vol_struct.vol_in_nash );
     ptr_list[48] = &(state->vol_struct.vol_out_nash );
     ptr_list[49] = &(state->vol_struct.vol_in_gw_start );
@@ -2241,12 +2387,12 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
     ptr_list[54] = &(state->time_step_size );
     ptr_list[55] = &(state->is_forcing_from_bmi );
     ptr_list[56] = state->forcing_file;
-    // ####### ptr_list[55] = &(state->forcing_file ); 
-    ptr_list[57] = &(state->direct_runoff_params_struct.surface_partitioning_scheme );
+    // ####### ptr_list[55] = &(state->forcing_file );
+    ptr_list[57] = &(state->infiltration_excess_params_struct.surface_water_partitioning_scheme );
     // ptr_list[56] = &(state->Schaake_adjusted_magic_constant_by_soil_type );
-    ptr_list[58] = &(state->N_nash);
+    ptr_list[58] = &(state->N_nash_subsurface);
     ptr_list[59] = &(state->K_lf);
-    ptr_list[60] = &(state->K_nash);
+    ptr_list[60] = &(state->K_nash_subsurface);
     ptr_list[61] = &(state->num_giuh_ordinates);
     //---------------------------------------
     // Vars in aorc_forcing_data_cfe struct
@@ -2272,10 +2418,10 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
     ptr_list[73] = state->forcing_data_precip_kg_per_m2;
     ptr_list[74] = state->forcing_data_time;
     ptr_list[75] = state->giuh_ordinates;
-    ptr_list[76] = state->nash_storage;
+    ptr_list[76] = state->nash_storage_subsurface;
     ptr_list[77] = state->runoff_queue_m_per_timestep;
-    ptr_list[78] = state->flux_output_direct_runoff_m;
-    ptr_list[79] = state->flux_giuh_runoff_m;
+    ptr_list[78] = state->infiltration_excess_m;
+    ptr_list[79] = state->flux_direct_runoff_m;
     ptr_list[80] = state->flux_nash_lateral_runoff_m;
     ptr_list[81] = state->flux_from_deep_gw_to_chan_m;
     ptr_list[82] = state->flux_perc_m;
@@ -2283,13 +2429,13 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
     ptr_list[84] = state->flux_Qout_m;
     ptr_list[85] = &(state->verbosity); 
     //---------------------------------------
-    // direct_runoff_params_struct vars
+    // infiltration_excess_params_struct vars
     // xinanjiang or schaake flag [56]
     //---------------------------------------
-    ptr_list[86] = &(state->direct_runoff_params_struct.Schaake_adjusted_magic_constant_by_soil_type );
-    ptr_list[87] = &(state->direct_runoff_params_struct.a_Xinanjiang_inflection_point_parameter );
-    ptr_list[88] = &(state->direct_runoff_params_struct.b_Xinanjiang_shape_parameter );
-    ptr_list[89] = &(state->direct_runoff_params_struct.x_Xinanjiang_shape_parameter );
+    ptr_list[86] = &(state->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type );
+    ptr_list[87] = &(state->infiltration_excess_params_struct.a_Xinanjiang_inflection_point_parameter );
+    ptr_list[88] = &(state->infiltration_excess_params_struct.b_Xinanjiang_shape_parameter );
+    ptr_list[89] = &(state->infiltration_excess_params_struct.x_Xinanjiang_shape_parameter );
     //-------------------------------------------------------------
     // Root zone AET development -rlm
     // ------------------------------------------------------------
@@ -2494,8 +2640,8 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
         // forcing_file is a string
         memcpy(state->forcing_file, src, size); }
         // state->forcing_file = (char *)src; }    // Doesn't work
-    else if (index == 55){ 
-        state->direct_runoff_params_struct.surface_partitioning_scheme = *(int *)src; }  
+    else if (index == 55){
+        state->infiltration_excess_params_struct.surface_water_partitioning_scheme = *(int *)src; }
     else if (index == 56){
         state->N_nash = *(int *)src; }          
     else if (index == 57){
@@ -2561,10 +2707,10 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
             state->runoff_queue_m_per_timestep[i] = *( ((double *)src) + i); } }   
     else if (index == 76){
         for (i=0; i<size; i++) {
-            state->flux_output_direct_runoff_m[i] = *( ((double *)src) + i); } } 
+            state->infiltration_excess_m[i] = *( ((double *)src) + i); } }
     else if (index == 77){
         for (i=0; i<size; i++) {
-            state->flux_giuh_runoff_m[i] = *( ((double *)src) + i); } } 
+            state->flux_direct_runoff_m[i] = *( ((double *)src) + i); } }
     else if (index == 78){
         for (i=0; i<size; i++) {
             state->flux_nash_lateral_runoff_m[i] = *( ((double *)src) + i); } }             
@@ -2586,15 +2732,15 @@ static int Get_state_var_ptrs (Bmi *self, void *ptr_list[])
     //--------------------------------------------------------------------------
     // direct_runoff_params_struc vars (includes xinanjiang AND schaake)
     //--------------------------------------------------------------------------
-    else if (index == 84){ 
-        state->direct_runoff_params_struct.Schaake_adjusted_magic_constant_by_soil_type = *(double *)src; }
-    else if (index == 85){ 
-        state->direct_runoff_params_struct.a_Xinanjiang_inflection_point_parameter = *(double *)src; }
-    else if (index == 86){ 
-        state->direct_runoff_params_struct.b_Xinanjiang_shape_parameter = *(double *)src; }
-    else if (index == 87){ 
-        state->direct_runoff_params_struct.x_Xinanjiang_shape_parameter = *(double *)src; }       
-    
+    else if (index == 84){
+        state->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = *(double *)src; }
+    else if (index == 85){
+        state->infiltration_excess_params_struct.a_Xinanjiang_inflection_point_parameter = *(double *)src; }
+    else if (index == 86){
+        state->infiltration_excess_params_struct.b_Xinanjiang_shape_parameter = *(double *)src; }
+    else if (index == 87){
+        state->infiltration_excess_params_struct.x_Xinanjiang_shape_parameter = *(double *)src; }
+
     return BMI_SUCCESS;
 }*/
 
@@ -2774,25 +2920,20 @@ cfe_state_struct *new_bmi_cfe(void)
 {
     cfe_state_struct *data;
     data = (cfe_state_struct *) malloc(sizeof(cfe_state_struct));
-    data->time_step_size = 3600;
-    data->time_step_fraction = 1.0;
+    data->time_step_size                = 3600;
+    data->time_step_fraction            = 1.0;
     data->forcing_data_precip_kg_per_m2 = NULL;
-    data->forcing_data_time = NULL;
-    data->giuh_ordinates = NULL;
-    data->nash_storage = NULL;
-    data->runoff_queue_m_per_timestep = NULL;
-    data->flux_Qout_m = NULL;
-
-    /* xinanjiang_dev
-        changing the name to the more general "direct runoff"
-    data->flux_Schaake_output_runoff_m = NULL;*/
-    data->flux_output_direct_runoff_m = NULL;
-
-    data->flux_from_deep_gw_to_chan_m = NULL;
-    data->flux_giuh_runoff_m = NULL;
-    data->flux_lat_m = NULL;
-    data->flux_nash_lateral_runoff_m = NULL;
-    data->flux_perc_m = NULL;
+    data->forcing_data_time             = NULL;
+    data->giuh_ordinates                = NULL;
+    data->nash_storage_subsurface       = NULL;
+    data->runoff_queue_m_per_timestep   = NULL;
+    data->flux_Qout_m                   = NULL;
+    data->infiltration_excess_m         = NULL;
+    data->flux_from_deep_gw_to_chan_m   = NULL;
+    data->flux_direct_runoff_m          = NULL;
+    data->flux_lat_m                    = NULL;
+    data->flux_nash_lateral_runoff_m    = NULL;
+    data->flux_perc_m                   = NULL;
 
     return data;
 }
@@ -2859,47 +3000,40 @@ Bmi* register_bmi_cfe(Bmi *model) {
 
 extern void run_cfe(cfe_state_struct* cfe_ptr){
     cfe(
-        &cfe_ptr->soil_reservoir_storage_deficit_m,               // Set in cfe function
-        cfe_ptr->NWM_soil_params,     // Set by config file
-        &cfe_ptr->soil_reservoir,          // Set in "init_soil_reservoir" function 
-        cfe_ptr->timestep_h,                                     // Set in initialize
-
-    /* xinanjiang_dev
-        changing the name to the more general "direct runoff"
-        cfe_ptr->Schaake_adjusted_magic_constant_by_soil_type,   // Set by config file*/
-        cfe_ptr->direct_runoff_params_struct,   // Set by config file, includes parameters for Schaake and/or XinanJiang*/
-
-        cfe_ptr->timestep_rainfall_input_m,                      // Set by bmi (set value) or read from file.
-
-     /* xinanjiang_dev
-        cfe_ptr->flux_Schaake_output_runoff_m,                  // Set by cfe function*/
-        cfe_ptr->flux_output_direct_runoff_m,
-
-        &cfe_ptr->infiltration_depth_m,                          // Set by Schaake partitioning scheme
-        cfe_ptr->flux_perc_m,                                   // Set to zero in definition.
-        cfe_ptr->flux_lat_m,                                    // Set by CFE function after soil_resevroir calc
-        &cfe_ptr->gw_reservoir_storage_deficit_m,                // Set by CFE function after soil_resevroir calc
-        &cfe_ptr->gw_reservoir,      // Set in initialize and from config file
-        cfe_ptr->flux_from_deep_gw_to_chan_m,                   // Set by CFE function after gw_reservoir calc
-        cfe_ptr->flux_giuh_runoff_m,                            // Set in CFE by convolution_integral
-        cfe_ptr->num_giuh_ordinates,                             // Set by config file with func. count_delimited_values
-        cfe_ptr->giuh_ordinates,                            // Set by configuration file.
-        cfe_ptr->runoff_queue_m_per_timestep,               // Set in initialize
-        cfe_ptr->flux_nash_lateral_runoff_m,                    // Set in CFE from nash_cascade function
-        cfe_ptr->N_nash,               // Set from config file
-        cfe_ptr->K_nash,                                         // Set from config file
-        cfe_ptr->nash_storage,                              // Set from config file
-        &cfe_ptr->et_struct,                                    // Set to zero with initalize. Set by BMI (set_value) during run
-        cfe_ptr->flux_Qout_m,                                    // Set by CFE function
+        &cfe_ptr->soil_reservoir_storage_deficit_m,     // Set in cfe function
+        cfe_ptr->NWM_soil_params,                       // Set by config file
+        &cfe_ptr->soil_reservoir,                       // Set in "init_soil_reservoir" function
+        cfe_ptr->timestep_h,                            // Set in initialize
+        cfe_ptr->infiltration_excess_params_struct,     // Set by config file, includes parameters for Schaake and/or XinanJiang*/
+        cfe_ptr->timestep_rainfall_input_m,             // Set by bmi (set value) or read from file.
+        cfe_ptr->infiltration_excess_m,
+        &cfe_ptr->infiltration_depth_m,                 // Set by Schaake partitioning scheme
+        cfe_ptr->flux_perc_m,                           // Set to zero in definition.
+        cfe_ptr->flux_lat_m,                            // Set by CFE function after soil_resevroir calc
+        &cfe_ptr->gw_reservoir_storage_deficit_m,       // Set by CFE function after soil_resevroir calc
+        &cfe_ptr->gw_reservoir,                         // Set in initialize and from config file
+        cfe_ptr->flux_from_deep_gw_to_chan_m,           // Set by CFE function after gw_reservoir calc
+        cfe_ptr->flux_direct_runoff_m,                  // Set in CFE by convolution_integral or Nash Cascade model
+        cfe_ptr->num_giuh_ordinates,                    // Set by config file with func. count_delimited_values
+        cfe_ptr->giuh_ordinates,                        // Set by configuration file.
+        cfe_ptr->runoff_queue_m_per_timestep,           // Set in initialize
+        cfe_ptr->flux_nash_lateral_runoff_m,            // Set in CFE from nash_cascade function
+        cfe_ptr->N_nash_subsurface,                     // Set from config file
+        cfe_ptr->K_nash_subsurface,                     // Set from config file
+        cfe_ptr->nash_storage_subsurface,               // Set from config file
+        &cfe_ptr->nash_surface_params,                  // struct containing Nash cascade model's parameters set by config file
+        &cfe_ptr->et_struct,                            // Set to zero with initalize. Set by BMI (set_value) during run
+        cfe_ptr->flux_Qout_m,                           // Set by CFE function
         &cfe_ptr->vol_struct,
-        cfe_ptr->time_step_size
-    );
+        cfe_ptr->time_step_size,
+        cfe_ptr->surface_runoff_scheme
+        );
 }
 
 // Functions for setting up CFE data, i.e., initializing...
 /*extern void init_soil_reservoir(cfe_state_struct* cfe_ptr, double alpha_fc, double max_storage, double storage,
                                 int is_storage_ratios)
-{*/
+*/
 extern void init_soil_reservoir(cfe_state_struct* cfe_ptr)
 {
     // calculate the activation storage for the secondary lateral flow outlet in the soil nonlinear reservoir.
@@ -2910,7 +3044,7 @@ extern void init_soil_reservoir(cfe_state_struct* cfe_ptr)
     // this equation calculates the amount of water stored in the 2 m thick soil column when the water content
     // at the center of the bottom discretization (trigger_z_m, below 0.5) is at field capacity
     // Initial parentheses calc equation 3 from param equiv. doc
-//#define STANDARD_ATMOSPHERIC_PRESSURE_PASCALS 101325
+    //#define STANDARD_ATMOSPHERIC_PRESSURE_PASCALS 101325
     // This may need to be changed as follows later, but for now, use the constant value
     //double Omega = (alpha_fc * cfe->forcing_data_surface_pressure_Pa[0] / WATER_SPECIFIC_WEIGHT) - 0.5;
     double Omega = ( cfe_ptr->NWM_soil_params.alpha_fc * STANDARD_ATMOSPHERIC_PRESSURE_PASCALS / WATER_SPECIFIC_WEIGHT) - 0.5;
@@ -2972,27 +3106,27 @@ extern void init_soil_reservoir(cfe_state_struct* cfe_ptr)
     }
 }*/
 
-extern void initialize_volume_trackers(cfe_state_struct* cfe_ptr){
-    cfe_ptr->vol_struct.volin = 0;
-    cfe_ptr->vol_struct.vol_runoff = 0;
-    cfe_ptr->vol_struct.vol_infilt = 0;
-    cfe_ptr->vol_struct.vol_to_soil = 0;
-    cfe_ptr->vol_struct.vol_to_gw = 0;
-    cfe_ptr->vol_struct.vol_soil_to_gw = 0;
+extern void initialize_volume_trackers(cfe_state_struct* cfe_ptr) {
+    cfe_ptr->vol_struct.volin            = 0;
+    cfe_ptr->vol_struct.vol_runoff       = 0;
+    cfe_ptr->vol_struct.vol_infilt       = 0;
+    cfe_ptr->vol_struct.vol_to_soil      = 0;
+    cfe_ptr->vol_struct.vol_to_gw        = 0;
+    cfe_ptr->vol_struct.vol_soil_to_gw   = 0;
     cfe_ptr->vol_struct.vol_soil_to_lat_flow = 0;
-    cfe_ptr->vol_struct.volout = 0;
-    cfe_ptr->vol_struct.vol_from_gw = 0;
-    cfe_ptr->vol_struct.vol_out_giuh = 0;
-    cfe_ptr->vol_struct.vol_in_nash = 0;
-    cfe_ptr->vol_struct.vol_out_nash = 0;
-    //cfe_ptr->vol_struct.volstart       += cfe_ptr->gw_reservoir.storage_m;    // initial mass balance checks in g.w. reservoir
-    cfe_ptr->vol_struct.volstart       = cfe_ptr->gw_reservoir.storage_m;    // YLiu: initial mass balance checks in g.w. reservoir
-    cfe_ptr->vol_struct.vol_in_gw_start = cfe_ptr->gw_reservoir.storage_m;  
-    cfe_ptr->vol_struct.volstart          += cfe_ptr->soil_reservoir.storage_m;    // initial mass balance checks in soil reservoir
-    cfe_ptr->vol_struct.vol_soil_start     = cfe_ptr->soil_reservoir.storage_m;
+    cfe_ptr->vol_struct.volout           = 0;
+    cfe_ptr->vol_struct.vol_from_gw      = 0;
+    cfe_ptr->vol_struct.vol_out_surface  = 0;
+    cfe_ptr->vol_struct.vol_in_nash      = 0;
+    cfe_ptr->vol_struct.vol_out_nash     = 0;
+    cfe_ptr->vol_struct.volstart        += cfe_ptr->gw_reservoir.storage_m;    // initial mass balance checks in g.w. reservoir
+    cfe_ptr->vol_struct.vol_in_gw_start  = cfe_ptr->gw_reservoir.storage_m;
+    cfe_ptr->vol_struct.volstart        += cfe_ptr->soil_reservoir.storage_m;    // initial mass balance checks in soil reservoir
+    cfe_ptr->vol_struct.vol_soil_start   = cfe_ptr->soil_reservoir.storage_m;
     cfe_ptr->vol_struct.vol_et_from_soil = 0;
     cfe_ptr->vol_struct.vol_et_from_rain = 0;
-    cfe_ptr->vol_struct.vol_et_to_atm = 0;
+    cfe_ptr->vol_struct.vol_et_from_retention_depth = 0;
+    cfe_ptr->vol_struct.vol_et_to_atm    = 0;
 }
 
 /**************************************************************************/
@@ -3006,36 +3140,45 @@ extern void print_cfe_flux_header(){
     Log(INFO, "#    ,            hourly ,  direct,   giuh ,lateral,  base,   total, storage, ice fraction, ice fraction \n");
     Log(INFO, "Time [h],rainfall [mm],runoff [mm],runoff [mm],flow [mm],flow [mm],discharge [mm],storage [mm],schaake [mm],xinan [-]\n");
 }
-extern void print_cfe_flux_at_timestep(cfe_state_struct* cfe_ptr){
+extern void print_cfe_flux_at_timestep(cfe_state_struct* cfe_ptr) {
   Log(INFO, "%d, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n",
-                           cfe_ptr->current_time_step,
-                           cfe_ptr->timestep_rainfall_input_m*1000.0,
-                           *cfe_ptr->flux_output_direct_runoff_m*1000.0,
-                           *cfe_ptr->flux_giuh_runoff_m*1000.0,
-                           *cfe_ptr->flux_nash_lateral_runoff_m*1000.0, 
-                           *cfe_ptr->flux_from_deep_gw_to_chan_m*1000.0,
-	                   *cfe_ptr->flux_Qout_m*1000.0,
-	                   cfe_ptr->soil_reservoir.storage_m*1000.0,
-	                   cfe_ptr->soil_reservoir.ice_fraction_schaake*1000.0,
-	                   cfe_ptr->soil_reservoir.ice_fraction_xinanjiang);
+         cfe_ptr->current_time_step,
+         cfe_ptr->timestep_rainfall_input_m*1000.0,
+         *cfe_ptr->infiltration_excess_m*1000.0,
+         *cfe_ptr->flux_direct_runoff_m*1000.0,
+         *cfe_ptr->flux_nash_lateral_runoff_m*1000.0,
+         *cfe_ptr->flux_from_deep_gw_to_chan_m*1000.0,
+         *cfe_ptr->flux_Qout_m*1000.0,
+         cfe_ptr->soil_reservoir.storage_m*1000.0,
+         cfe_ptr->soil_reservoir.ice_fraction_schaake*1000.0,
+         cfe_ptr->soil_reservoir.ice_fraction_xinanjiang);
 }
 
 extern void mass_balance_check(cfe_state_struct* cfe_ptr){
     //-----------------------------------------------------------
     // PERFORM MASS BALANCE CHECKS AND WRITE RESULTS TO stderr.
     //-----------------------------------------------------------
-    
-    double volend= cfe_ptr->soil_reservoir.storage_m+cfe_ptr->gw_reservoir.storage_m;
+
+    double volend = cfe_ptr->soil_reservoir.storage_m+cfe_ptr->gw_reservoir.storage_m;
     double vol_in_gw_end = cfe_ptr->gw_reservoir.storage_m;
-    double vol_end_giuh = 0.0;
-    double vol_in_nash_end = 0.0;
+    double vol_surface_end = 0.0; // volume in the giuh or nash array at the end (on the surface)
+    double vol_nash_subsurface_end = 0.0; // volume at the end in the nash cascade for subsurface
     double vol_soil_end;
     
     // the GIUH queue might have water in it at the end of the simulation, so sum it up.
-    for(i=0;i<cfe_ptr->num_giuh_ordinates;i++) vol_end_giuh+=cfe_ptr->runoff_queue_m_per_timestep[i];
-    
-    for(i=0;i<cfe_ptr->N_nash;i++)  vol_in_nash_end+=cfe_ptr->nash_storage[i];
-    
+    if (cfe_ptr->surface_runoff_scheme == GIUH) {
+      for(i=0;i<cfe_ptr->num_giuh_ordinates;i++)
+	    vol_surface_end += cfe_ptr->runoff_queue_m_per_timestep[i];
+    }
+    else if (cfe_ptr->surface_runoff_scheme == NASH_CASCADE) {
+      for(i=0;i<cfe_ptr->nash_surface_params.N_nash;i++)
+	    vol_surface_end += cfe_ptr->nash_surface_params.nash_storage[i];
+    }
+
+    cfe_ptr->vol_struct.vol_end_surface = vol_surface_end; // update the vol in the mass balance struct
+
+    for(i=0;i<cfe_ptr->N_nash_subsurface;i++)  vol_nash_subsurface_end += cfe_ptr->nash_storage_subsurface[i];
+
     vol_soil_end=cfe_ptr->soil_reservoir.storage_m;
     
     double global_residual;
@@ -3049,88 +3192,100 @@ extern void mass_balance_check(cfe_state_struct* cfe_ptr){
     double nash_residual;
     double gw_residual;
     
-    global_residual = cfe_ptr->vol_struct.volstart + cfe_ptr->vol_struct.volin - 
-                      cfe_ptr->vol_struct.volout - volend - vol_end_giuh;
-    Log(INFO, "GLOBAL MASS BALANCE\n");
-    Log(INFO, "  initial volume: %8.4lf m\n",cfe_ptr->vol_struct.volstart);
-    Log(INFO, "    volume input: %8.4lf m\n",cfe_ptr->vol_struct.volin);
-    Log(INFO, "   volume output: %8.4lf m\n",cfe_ptr->vol_struct.volout);
-    Log(INFO, "    final volume: %8.4lf m\n",volend);
-    Log(INFO, "        residual: %6.4e m\n",global_residual);
-    if(cfe_ptr->vol_struct.volin>0.0) Log(INFO, "global pct. err: %6.4e percent of inputs\n",global_residual/cfe_ptr->vol_struct.volin*100.0);
-    else          Log(INFO, "global pct. err: %6.4e percent of initial\n",global_residual/cfe_ptr->vol_struct.volstart*100.0);
-    if(!is_fabs_less_than_epsilon(global_residual,1.0e-12)) 
-                  Log(SEVERE, "GLOBAL MASS BALANCE CHECK FAILED\n");
+
+    global_residual = cfe_ptr->vol_struct.volstart + cfe_ptr->vol_struct.volin -
+                      cfe_ptr->vol_struct.volout - volend - cfe_ptr->vol_struct.vol_end_surface;
+    Log(INFO, "========================= Simulation Summary ========================= \n");
+    Log(INFO, "********************* GLOBAL MASS BALANCE ********************* \n");
+    Log(INFO, " Volume initial   = %8.4lf m\n",cfe_ptr->vol_struct.volstart);
+    Log(INFO, " Volume input     = %8.4lf m\n",cfe_ptr->vol_struct.volin);
+    Log(INFO, " Volume output    = %8.4lf m\n",cfe_ptr->vol_struct.volout);
+    Log(INFO, " Final volume     = %8.4lf m\n",volend);
+    Log(INFO, " Global residual  = %6.4e m\n",global_residual);
+    if(cfe_ptr->vol_struct.volin>0.0)
+      Log(INFO, " Global percent error = %6.4e percent of inputs\n",global_residual/cfe_ptr->vol_struct.volin*100.0);
+    else
+      Log(INFO, " Global pct. err: %6.4e percent of initial\n",global_residual/cfe_ptr->vol_struct.volstart*100.0);
+
+    if(!is_fabs_less_than_epsilon(global_residual,1.0e-12))
+      Log(WARNING, "GLOBAL MASS BALANCE CHECK FAILED\n");
+
+    direct_residual = cfe_ptr->vol_struct.volin - cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_infilt -
+                      cfe_ptr->vol_struct.vol_et_from_rain;
     
-    /* xinanjiang_dev
-    schaake_residual = cfe_ptr->vol_struct.volin - cfe_ptr->vol_struct.vol_sch_runoff - cfe_ptr->vol_struct.vol_sch_infilt;
-    printf(" SCHAAKE MASS BALANCE\n");
-    printf("  surface runoff: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_runoff);
-    printf("    infiltration: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_infilt);
-    printf("schaake residual: %6.4e m\n",schaake_residual);  // should equal 0.0
-    if(!is_fabs_less_than_epsilon(schaake_residual,1.0e-12))
-                  printf("SCHAAKE PARTITIONING MASS BALANCE CHECK FAILED\n");*/
-    direct_residual = cfe_ptr->vol_struct.volin - cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_infilt-cfe_ptr->vol_struct.vol_et_from_rain;
-    Log(INFO, " DIRECT RUNOFF MASS BALANCE\n");
-    Log(INFO, "  surface runoff: %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
-    Log(INFO, "    infiltration: %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
-    Log(INFO, "    vol_et_from_rain: %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
-    Log(INFO, "direct residual: %6.4e m\n",direct_residual);  // should equal 0.0
-    if(!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
-                  Log(SEVERE, "DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
+    Log(INFO, ("******************* PRECIPITATION MASS BALANCE *****************\n");
+    Log(INFO, " Volume input        = %8.4lf m\n",cfe_ptr->vol_struct.volin);
+    Log(INFO, " Infiltration Excess = %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
+    Log(INFO, " Infiltration        = %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
+    Log(INFO, " Vol_et_from_rain    = %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
+    Log(INFO, " Precip residual     = %6.4e m\n",direct_residual);  // should equal 0.0
+    if (!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
+        Log(SEVERE, "DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
     
     /* xinanjiang_dev
     giuh_residual = cfe_ptr->vol_struct.vol_out_giuh - cfe_ptr->vol_struct.vol_sch_runoff - vol_end_giuh;   */
     giuh_residual = cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_out_giuh - vol_end_giuh;
     Log(INFO, " GIUH MASS BALANCE\n");
 
-    /* xinanjiang_dev
-    Log(INFO, "  vol. into giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_runoff);    */
-    Log(INFO, "  vol. into giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
-    Log(WARNING, "   vol. out giuh: %8.4lf m\n",cfe_ptr->vol_struct.vol_out_giuh);
-    Log(WARNING, " vol. end giuh q: %8.4lf m\n",cfe_ptr->vol_struct.vol_end_giuh);
-    Log(INFO, "   giuh residual: %6.4e m\n",giuh_residual);  // should equal zero
+    Log(INFO, "******************* PRECIPITATION MASS BALANCE *****************\n");
+    Log(INFO, " Volume input        = %8.4lf m\n",cfe_ptr->vol_struct.volin);
+    Log(INFO, " Infiltration Excess = %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
+    Log(INFO, " Infiltration        = %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
+    Log(INFO, " Vol_et_from_rain    = %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
+    Log(INFO, " Precip residual     = %6.4e m\n",direct_residual);  // should equal 0.0
+    if(!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
+      Log(WARNING "DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
+
+    giuh_residual = cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_out_surface - cfe_ptr->vol_struct.vol_end_surface -
+                    cfe_ptr->vol_struct.vol_runon_infilt;
+    Log(INFO, "********************* SURFACE MASS BALANCE *********************\n");
+    Log(INFO, " Volume into surface         = %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
+    Log(INFO, " Volume out surface          = %8.4lf m\n",cfe_ptr->vol_struct.vol_out_surface);
+    Log(INFO, " Volume end surface          = %8.4lf m\n",cfe_ptr->vol_struct.vol_end_surface);
+    Log(INFO, " Runon infiltration          = %8.4lf m\n",cfe_ptr->vol_struct.vol_runon_infilt);
+    Log(INFO, " Vol_et_from_retention_depth = %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_retention_depth);
+    Log(INFO, " Surface residual            = %6.4e m\n", giuh_residual);  // should equal zero
     if(!is_fabs_less_than_epsilon(giuh_residual,1.0e-12))
                   Log(SEVERE, "GIUH MASS BALANCE CHECK FAILED\n");
 
-    /* xinanjiang_dev 
-    soil_residual=cfe_ptr->vol_struct.vol_soil_start + cfe_ptr->vol_struct.vol_sch_infilt -      */
-    soil_residual=cfe_ptr->vol_struct.vol_soil_start + cfe_ptr->vol_struct.vol_infilt -
-                  cfe_ptr->vol_struct.vol_soil_to_lat_flow - vol_soil_end - cfe_ptr->vol_struct.vol_to_gw - cfe_ptr->vol_struct.vol_et_from_soil;
-                  
+    soil_residual = cfe_ptr->vol_struct.vol_soil_start + cfe_ptr->vol_struct.vol_infilt + cfe_ptr->vol_struct.vol_runon_infilt -
+                    cfe_ptr->vol_struct.vol_soil_to_lat_flow - vol_soil_end - cfe_ptr->vol_struct.vol_to_gw -
+                    cfe_ptr->vol_struct.vol_et_from_soil;
+                    
     Log(INFO, " SOIL WATER CONCEPTUAL RESERVOIR MASS BALANCE\n");
     Log(INFO, "   init soil vol: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_start);     
 
-    /* xinanjiang_dev
-    Log(INFO, "  vol. into soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_sch_infilt);    */
-    Log(INFO, "  vol. into soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
-    Log(INFO, "vol.soil2latflow: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_lat_flow);
-    Log(INFO, " vol. soil to gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_gw);
-    Log(INFO, " final vol. soil: %8.4lf m\n",vol_soil_end);  
-    Log(INFO, " vol. et from soil: %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_soil);  
-    Log(INFO, "vol. soil resid.: %6.4e m\n",soil_residual);
+
+    Log(INFO, "*********** SOIL WATER CONCEPTUAL RESERVOIR MASS BALANCE *******\n");
+    Log(INFO, " Initial soil vol     = %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_start);
+    Log(INFO, " Volume into soil     = %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
+    Log(INFO, " Volume soil2latflow  = %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_lat_flow);
+    Log(INFO, " Volume soil to GW    = %8.4lf m\n",cfe_ptr->vol_struct.vol_soil_to_gw);
+    Log(INFO, " Final volume soil    = %8.4lf m\n",vol_soil_end);
+    Log(INFO, " Volume et from soil  = %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_soil);
+    Log(INFO, " Volume soil residual = %6.4e m\n",soil_residual);
     if(!is_fabs_less_than_epsilon(soil_residual,1.0e-12))
-                   Log(SEVERE, "SOIL CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
-    
-    nash_residual=cfe_ptr->vol_struct.vol_in_nash - cfe_ptr->vol_struct.vol_out_nash - vol_in_nash_end;
-    Log(INFO, " NASH CASCADE CONCEPTUAL RESERVOIR MASS BALANCE\n");
-    Log(INFO, "    vol. to nash: %8.4lf m\n",cfe_ptr->vol_struct.vol_in_nash);
-    Log(INFO, "  vol. from nash: %8.4lf m\n",cfe_ptr->vol_struct.vol_out_nash);
-    Log(INFO, " final vol. nash: %8.4lf m\n",vol_in_nash_end);
-    Log(INFO, "nash casc resid.: %6.4e m\n",nash_residual);
+      Log(WARNING, "SOIL CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
+
+    nash_residual = cfe_ptr->vol_struct.vol_in_nash - cfe_ptr->vol_struct.vol_out_nash - vol_nash_subsurface_end;
+    Log(INFO, "************* NASH CASCADE (SUBSURFACE) MASS BALANCE ***********\n");
+    Log(INFO, " Volume to Nash   = %8.4lf m\n",cfe_ptr->vol_struct.vol_in_nash);
+    Log(INFO, " Volume from Nash = %8.4lf m\n",cfe_ptr->vol_struct.vol_out_nash);
+    Log(INFO, " Final vol. Nash  = %8.4lf m\n",vol_nash_subsurface_end);
+    Log(INFO, " Nash casc resid. = %6.4e m\n",nash_residual);
     if(!is_fabs_less_than_epsilon(nash_residual,1.0e-12))
         Log(SEVERE, "NASH CASCADE CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
     
     
     gw_residual = cfe_ptr->vol_struct.vol_in_gw_start + cfe_ptr->vol_struct.vol_to_gw - cfe_ptr->vol_struct.vol_from_gw - vol_in_gw_end;
-    Log(INFO, " GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE\n");
-    Log(INFO, "init gw. storage: %8.4lf m\n",cfe_ptr->vol_struct.vol_in_gw_start);
-    Log(INFO, "       vol to gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_to_gw);
-    Log(INFO, "     vol from gw: %8.4lf m\n",cfe_ptr->vol_struct.vol_from_gw);
-    Log(INFO, "final gw.storage: %8.4lf m\n",vol_in_gw_end);
-    Log(INFO, "    gw. residual: %6.4e m\n",gw_residual);
+    Log(INFO, "********** GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE *******\n");
+    Log(INFO, " Initial GW storage = %8.4lf m\n",cfe_ptr->vol_struct.vol_in_gw_start);
+    Log(INFO, " Volume to GW       = %8.4lf m\n",cfe_ptr->vol_struct.vol_to_gw);
+    Log(INFO, " Volume from GW     = %8.4lf m\n",cfe_ptr->vol_struct.vol_from_gw);
+    Log(INFO, " Final GW storage   = %8.4lf m\n",vol_in_gw_end);
+    Log(INFO, " GW residual        = %6.4e m\n",gw_residual);
     if(!is_fabs_less_than_epsilon(gw_residual,1.0e-12))
-        Log(SEVERE, "GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
+        Log(WARNING, "GROUNDWATER CONCEPTUAL RESERVOIR MASS BALANCE CHECK FAILED\n");
 }
 
 /**************************************************************************/
@@ -3252,7 +3407,7 @@ void itwo_alloc_cfe(int ***array, int rows, int cols) {
     int i, frows, fcols;
 
     if ((rows == 0) || (cols == 0)) {
-        Log(WARNING, "Error: Attempting to allocate array of size 0\n");
+        Log(SEVERE, "Attempting to allocate array of size 0\n");
     }
 
     frows = rows + 1;  /* added one for FORTRAN numbering */
@@ -3277,7 +3432,7 @@ void dtwo_alloc_cfe(double ***array, int rows, int cols) {
     int i, frows, fcols;
 
     if ((rows == 0) || (cols == 0)) {
-        Log(WARNING, "Error: Attempting to allocate array of size 0\n");
+        Log(SEVERE, "Error: Attempting to allocate array of size 0\n");
     }
 
     frows = rows + 1;  /* added one for FORTRAN numbering */
@@ -3303,7 +3458,7 @@ void d_alloc_cfe(double **var, int size) {
 
     *var = (double *) malloc(size * sizeof(double));
     if (*var == NULL) {
-        Log(WARNING, "Problem allocating memory for array in d_alloc.\n");
+        Log(SEVERE, "Problem allocating memory for array in d_alloc.\n");
         return;
     } else
         memset(*var, 0, size * sizeof(double));
@@ -3315,7 +3470,7 @@ void i_alloc_cfe(int **var, int size) {
 
     *var = (int *) malloc(size * sizeof(int));
     if (*var == NULL) {
-        Log(WARNING, "Problem allocating memory in i_alloc\n");
+        Log(SEVERE, "Problem allocating memory in i_alloc\n");
         return;
     } else
         memset(*var, 0, size * sizeof(int));
@@ -3342,13 +3497,12 @@ void i_alloc_cfe(int **var, int size) {
 */
 
 
-double greg_2_jul_cfe(
-        long year,
-        long mon,
-        long day,
-        long h,
-        long mi,
-        double se) {
+double greg_2_jul_cfe(long year,
+                      long mon,
+                      long day,
+                      long h,
+                      long mi,
+                      double se) {
     long m = mon, d = day, y = year;
     long c, ya, j;
     double seconds = h * 3600.0 + mi * 60 + se;
