@@ -9,6 +9,7 @@
 #include <assert.h>
 #include "conceptual_reservoir.h"
 #include "giuh.h"
+#include "nash_cascade.h"
 
 #define TRUE 1
 #define FALSE 0

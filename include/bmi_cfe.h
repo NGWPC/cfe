@@ -7,6 +7,7 @@ extern "C" {
 
 #include "./cfe.h"
 #include "bmi.h"
+#include "nash_cascade.h"
 
 //--------------------------------------------------
 // Experiment to simplify BMI implementation (SDP)

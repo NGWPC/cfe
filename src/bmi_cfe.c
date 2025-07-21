@@ -942,7 +942,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         Log(SEVERE, "Config param 'soil_storage' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
-    if (is_K_nash_set == FALSE) {
+    if (is_K_nash_subsurface_set == FALSE) {
         Log(SEVERE, "Config param 'K_nash' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
@@ -955,7 +955,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         return BMI_FAILURE;
     }
     if (is_gw_storage_set == FALSE) {
-        Log(SEVERE, "Config param 'gw_storage' not found in config file\. Aborting...n");
+        Log(SEVERE, "Config param 'gw_storage' not found in config file. Aborting...n");
         return BMI_FAILURE;
     }
     
@@ -992,13 +992,13 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             return BMI_FAILURE;
         }
 	    if (is_urban_decimal_fraction_set == FALSE) {
-	    Log(SEVERE, "Config param 'urban_decimal_fraction' not found in config file. Aborting...\n");
-	    return BMI_FAILURE;
+	        Log(SEVERE, "Config param 'urban_decimal_fraction' not found in config file. Aborting...\n");
+	        return BMI_FAILURE;
 	    }  
     }
 
-    if(model->direct_runoff_params_struct.surface_partitioning_scheme == Schaake){
-        model->direct_runoff_params_struct.Schaake_adjusted_magic_constant_by_soil_type = model->NWM_soil_params.refkdt * model->NWM_soil_params.satdk / 0.000002;   
+    if(model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Schaake){
+        model->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = model->NWM_soil_params.refkdt * model->NWM_soil_params.satdk / 0.000002;   
         Log(INFO, "Schaake Magic Constant calculated\n");
     }
     
@@ -1021,7 +1021,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
       Log(INFO, "Counted number of GIUH ordinates (%d)\n", model->num_giuh_ordinates);
       
       if (model->num_giuh_ordinates < 1) {
-        Log(SEVERE, ("Number of GIUH ordinates less than 1 (%d). Aborting... \n", model->num_giuh_ordinates);
+        Log(SEVERE, "Number of GIUH ordinates less than 1 (%d). Aborting... \n", model->num_giuh_ordinates);
         return BMI_FAILURE;
       }
       
@@ -1040,32 +1040,28 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     }
     else if(model->surface_runoff_scheme == NASH_CASCADE) {
       if (is_N_nash_surface_set == FALSE) {
-      Log(SEVERE, "Config param 'N_nash_surface' not found in config file. Aborting...\n");
-	return BMI_FAILURE;
+        Log(SEVERE, "Config param 'N_nash_surface' not found in config file. Aborting...\n");
+	    return BMI_FAILURE;
       }
       if (is_K_nash_surface_set == FALSE) {
-      Log(SEVERE, "Config param 'K_nash_surface' not found in config file. Aborting...\n");
-	return BMI_FAILURE;
+        Log(SEVERE, "Config param 'K_nash_surface' not found in config file. Aborting...\n");
+    	return BMI_FAILURE;
       }
       if (is_nsubsteps_nash_surface_set == FALSE) {
         Log(INFO, "Config param 'nsubsteps_nash_surface' not found in config file, default value is 10.\n");
 	    model->nash_surface_params.nsubsteps = 10;      // default value of the number of sub-timesteps  
       }
       if (is_nash_storage_surface_set == FALSE) {
-      Log(SEVERE, "Config param 'nash_storage_surface' not found in config file. Aborting...\n");
-	return BMI_FAILURE;
+        Log(SEVERE, "Config param 'nash_storage_surface' not found in config file. Aborting...\n");
+	    return BMI_FAILURE;
       }
       if (is_K_infiltration_nash_surface_set == FALSE) {
-#if CFE_DEBUG >= 1
-	printf("Config param 'Kinf_nash_surface' not found in config file, default value is 0.001 [1/hr] \n");
-#endif
-	model->nash_surface_params.K_infiltration  = 0.001;   // used in the runon infiltration
+        Log(WARNING, "Config param 'Kinf_nash_surface' not found in config file, default value is 0.001 [1/hr] \n");
+    	model->nash_surface_params.K_infiltration  = 0.001;   // used in the runon infiltration
       }
       if (is_retention_depth_nash_surface_set == FALSE) {
-#if CFE_DEBUG >= 1
-	printf("Config param 'retention_depth_nash_surface' not found in config file, default value is 1.0 [mm] \n");
-#endif
-	model->nash_surface_params.retention_depth = 0.001;  // usually in the range of 1-5 mm
+        Log(WARNING, "Config param 'retention_depth_nash_surface' not found in config file, default value is 1.0 [mm] \n");
+    	model->nash_surface_params.retention_depth = 0.001;  // usually in the range of 1-5 mm
       }
       
       
@@ -1102,10 +1098,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 
     if(model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Schaake) {
       model->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = model->NWM_soil_params.refkdt * model->NWM_soil_params.satdk / 0.000002;
-
-#if CFE_DEBUG >= 1
-      printf("Schaake Magic Constant calculated\n");
-#endif
+      Log(INFO, "Schaake Magic Constant calculated\n");
     }
     
     if (is_sft_coupled_set == TRUE && model->infiltration_excess_params_struct.surface_water_partitioning_scheme == Schaake) {
@@ -1120,9 +1113,6 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     // set sft_coupled flag to false if the parameter is not provided in the config file.
     model->soil_reservoir.is_sft_coupled = (is_sft_coupled_set == TRUE) ? TRUE : FALSE;
 
-// Used for parsing strings representing arrays of values below
-    char *copy, *value;
-    
     /*------------------- Root zone AET development -rlm----------------------------- */
     if (is_aet_rootzone_set == TRUE ) {
       if (is_max_rootzone_layer_set == FALSE) {
@@ -1479,7 +1469,7 @@ static int Update_until (Bmi *self, double t)
     }
 
     if(self->get_current_time(self, &now) == BMI_FAILURE) {
-        Log(SEVERE, "get_current_time failure. Aborting...\
+        Log(SEVERE, "get_current_time failure. Aborting...\n");
         return BMI_FAILURE;
         }
 
@@ -1965,7 +1955,7 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
     if (strcmp (name, "SURF_RUNOFF_SCHEME") == 0) {
       cfe_state_struct *cfe_ptr;
       cfe_ptr = (cfe_state_struct *) self->data;
-      *dest = (void*)&cfe_ptr->direct_runoff_params_struct.surface_partitioning_scheme;
+      *dest = (void*)&cfe_ptr->infiltration_excess_params_struct.surface_water_partitioning_scheme;
       return BMI_SUCCESS;
     }
 
@@ -3213,29 +3203,15 @@ extern void mass_balance_check(cfe_state_struct* cfe_ptr){
     direct_residual = cfe_ptr->vol_struct.volin - cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_infilt -
                       cfe_ptr->vol_struct.vol_et_from_rain;
     
-    Log(INFO, ("******************* PRECIPITATION MASS BALANCE *****************\n");
-    Log(INFO, " Volume input        = %8.4lf m\n",cfe_ptr->vol_struct.volin);
-    Log(INFO, " Infiltration Excess = %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
-    Log(INFO, " Infiltration        = %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
-    Log(INFO, " Vol_et_from_rain    = %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
-    Log(INFO, " Precip residual     = %6.4e m\n",direct_residual);  // should equal 0.0
-    if (!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
-        Log(SEVERE, "DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
-    
-    /* xinanjiang_dev
-    giuh_residual = cfe_ptr->vol_struct.vol_out_giuh - cfe_ptr->vol_struct.vol_sch_runoff - vol_end_giuh;   */
-    giuh_residual = cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_out_giuh - vol_end_giuh;
-    Log(INFO, " GIUH MASS BALANCE\n");
-
     Log(INFO, "******************* PRECIPITATION MASS BALANCE *****************\n");
     Log(INFO, " Volume input        = %8.4lf m\n",cfe_ptr->vol_struct.volin);
     Log(INFO, " Infiltration Excess = %8.4lf m\n",cfe_ptr->vol_struct.vol_runoff);
     Log(INFO, " Infiltration        = %8.4lf m\n",cfe_ptr->vol_struct.vol_infilt);
     Log(INFO, " Vol_et_from_rain    = %8.4lf m\n",cfe_ptr->vol_struct.vol_et_from_rain);
     Log(INFO, " Precip residual     = %6.4e m\n",direct_residual);  // should equal 0.0
-    if(!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
-      Log(WARNING "DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILED\n");
-
+    if (!is_fabs_less_than_epsilon(direct_residual,1.0e-12))
+        Log(SEVERE, "DIRECT RUNOFF PARTITIONING MASS BALANCE CHECK FAILEDS\n");
+    
     giuh_residual = cfe_ptr->vol_struct.vol_runoff - cfe_ptr->vol_struct.vol_out_surface - cfe_ptr->vol_struct.vol_end_surface -
                     cfe_ptr->vol_struct.vol_runon_infilt;
     Log(INFO, "********************* SURFACE MASS BALANCE *********************\n");
