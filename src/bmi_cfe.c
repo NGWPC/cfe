@@ -6,6 +6,7 @@
 #include <time.h>
 #include <float.h>
 #include "logger.h"
+#include "bmi_serialization.h"
 
 #ifndef WATER_SPECIFIC_WEIGHT
 #define WATER_SPECIFIC_WEIGHT 9810
@@ -1537,6 +1538,10 @@ static int Finalize (Bmi *self)
             free(model->flux_nash_lateral_runoff_m);
         if( model->flux_perc_m != NULL )
             free(model->flux_perc_m);
+
+        // clear serialized data
+        if (model->serialized != NULL)
+            free(model->serialized);
         
         free(self->data);
     }
@@ -1619,7 +1624,19 @@ static int Get_var_type (Bmi *self, const char *name, char * type)
         }
     }
 
-    // If we get here, it means the variable type wasn't recognized
+    // serialization
+    if (strcmp(name, "serialization_create") == 0) {
+        strncpy(type, "uint64_t", BMI_MAX_TYPE_NAME);
+        return BMI_SUCCESS;
+    } else if (strcmp(name, "serialization_state") == 0) {
+        strncpy(type, "char", BMI_MAX_TYPE_NAME);
+        return BMI_SUCCESS;
+    } else if (strcmp(name, "serialization_free") == 0) {
+        strncpy(type, "int", BMI_MAX_TYPE_NAME);
+        return BMI_SUCCESS;
+    }
+
+    // If we get here, it means the variable name wasn't recognized
     type[0] = '\0';
     Log(SEVERE, "variable type wasn't recognized. Aborting...\n");   
     return BMI_FAILURE;
@@ -1654,6 +1671,14 @@ static int Get_var_itemsize (Bmi *self, const char *name, int * size)
     }
     else if (strcmp (type, "long") == 0) {
         *size = sizeof(long);
+        return BMI_SUCCESS;
+    }
+    else if (strcmp(type, "uint64_t") == 0) {
+        *size = sizeof(uint64_t);
+        return BMI_SUCCESS;
+    }
+    else if (strcmp(type, "char") == 0) {
+        *size = sizeof(char);
         return BMI_SUCCESS;
     }
     else {
@@ -1711,6 +1736,20 @@ static int Get_var_units (Bmi *self, const char *name, char * units)
 
 static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
 {
+    // serialization
+    if (strcmp(name, "serialization_create") == 0) {
+        *nbytes = sizeof(uint64_t);
+        return BMI_SUCCESS;
+    } else if (strcmp(name, "serialization_state") == 0) {
+        cfe_state_struct* model = (cfe_state_struct*)self->data;
+        if (model->serialized == NULL)
+            return BMI_FAILURE;
+        *nbytes = model->serialized_length;
+        return BMI_SUCCESS;
+    } else if (strcmp(name, "serialization_free") == 0) {
+        *nbytes = sizeof(int);
+        return BMI_SUCCESS;
+    }
     int item_size;
     int item_size_result = Get_var_itemsize(self, name, &item_size);
     if (item_size_result != BMI_SUCCESS) {
@@ -2003,6 +2042,27 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
     }
 //-------------------------------------------------------------------
 
+
+    /***********************************************************/
+    /********    SERIALIZATION    ******************************/
+    /***********************************************************/
+    if (strcmp(name, "serialization_create") == 0) {
+        int result = new_serialized_cfe(self);
+        if (result == BMI_SUCCESS) {
+            cfe_state_struct* model = (cfe_state_struct*)self->data;
+            *dest = &model->serialized_length;
+            return BMI_SUCCESS;
+        }
+        return BMI_FAILURE;
+    }
+    if (strcmp(name, "serialization_state") == 0) {
+        cfe_state_struct* model = (cfe_state_struct*)self->data;
+        if (model->serialized == NULL)
+            return BMI_FAILURE;
+        *dest = model->serialized;
+        return BMI_SUCCESS;
+    }
+
     return BMI_FAILURE;
 }
 
@@ -2042,6 +2102,24 @@ static int Get_value_at_indices (Bmi *self, const char *name, void *dest, int *i
 
 static int Get_value (Bmi *self, const char *name, void *dest)
 {
+    // special cases for serialization
+    if (strcmp(name, "serialization_create") == 0) {
+        void* ptr;
+        int result = Get_value_ptr(self, name, &ptr); // run this to create a new save state
+        if (result != BMI_SUCCESS)
+            return BMI_FAILURE;
+        memcpy(dest, ptr, sizeof(uint64_t));
+        return BMI_SUCCESS;
+    }
+    if (strcmp(name, "serialization_state") == 0) {
+        cfe_state_struct* model = (cfe_state_struct*)self->data;
+        if (model->serialized != NULL) {
+            memcpy(dest, model->serialized, model->serialized_length);
+            return BMI_SUCCESS;
+        }
+        return BMI_FAILURE;
+    }
+
     // Use nested call to "by index" version
 
     // Here, for now at least, we know all the variables are scalar, so
@@ -2080,6 +2158,17 @@ static int Set_value_at_indices (Bmi *self, const char *name, int * inds, int le
 
 static int Set_value (Bmi *self, const char *name, void *src)
 {
+    // serialization
+    if (strcmp(name, "serialization_state") == 0) {
+        return load_serialized_cfe(self, (char*)src);
+    } else if (strcmp(name, "serialization_free") == 0) {
+        return free_serialized_cfe(self);
+    }
+    // Avoid using set value, call instead set_value_at_index
+    // Use nested call to "by index" version
+
+    // Here, for now at least, we know all the variables are scalar, so
+    int inds[] = {0};
 
     void * dest = NULL;
     int nbytes  = 0;
