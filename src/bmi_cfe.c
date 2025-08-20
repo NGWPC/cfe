@@ -2998,21 +2998,9 @@ int read_file_line_counts_cfe(const char* file_name, int* line_count, int* max_l
 cfe_state_struct *new_bmi_cfe(void)
 {
     cfe_state_struct *data;
-    data = (cfe_state_struct *) malloc(sizeof(cfe_state_struct));
+    data = (cfe_state_struct *) calloc(1, sizeof(cfe_state_struct));
     data->time_step_size                = 3600;
     data->time_step_fraction            = 1.0;
-    data->forcing_data_precip_kg_per_m2 = NULL;
-    data->forcing_data_time             = NULL;
-    data->giuh_ordinates                = NULL;
-    data->nash_storage_subsurface       = NULL;
-    data->runoff_queue_m_per_timestep   = NULL;
-    data->flux_Qout_m                   = NULL;
-    data->infiltration_excess_m         = NULL;
-    data->flux_from_deep_gw_to_chan_m   = NULL;
-    data->flux_direct_runoff_m          = NULL;
-    data->flux_lat_m                    = NULL;
-    data->flux_nash_lateral_runoff_m    = NULL;
-    data->flux_perc_m                   = NULL;
 
     return data;
 }
