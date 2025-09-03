@@ -244,7 +244,7 @@ extern void cfe(
   if(flux_from_deep_gw_to_chan_m >  gw_reservoir_struct->storage_m)  {
   flux_from_deep_gw_to_chan_m=gw_reservoir_struct->storage_m;
   // TODO: set a flag when flux larger than storage
-  Log(SEVERE, "WARNING: Groundwater flux larger than storage \n");
+  Log(WARNING, "Groundwater flux larger than storage \n");
   }
  
   massbal_struct->vol_from_gw+=flux_from_deep_gw_to_chan_m;
