@@ -7,6 +7,7 @@ extern "C" {
 
 #include "./cfe.h"
 #include "bmi.h"
+#include <stdint.h>
 
 //--------------------------------------------------
 // Experiment to simplify BMI implementation (SDP)
@@ -50,6 +51,7 @@ struct cfe_state_struct {
     double timestep_rainfall_input_m;
     double soil_reservoir_storage_deficit_m;
     double infiltration_depth_m;
+    double* infiltration_excess_m;
     double gw_reservoir_storage_deficit_m;
 
     double timestep_h;
@@ -64,7 +66,7 @@ struct cfe_state_struct {
     struct massbal vol_struct;
 
     /* xinanjiang_dev */
-    struct direct_runoff_parameters_structure direct_runoff_params_struct;
+    struct infiltration_excess_parameters_structure infiltration_excess_params_struct;
 
     // Epoch-based start time (BMI start time is considered 0.0)
     long epoch_start_time;
@@ -77,19 +79,15 @@ struct cfe_state_struct {
 
     char* forcing_file;
 
-    /* xinanjiang_dev
-    double Schaake_adjusted_magic_constant_by_soil_type;    */
-
-    //LKC Changed this to N_nash for consistency
-    //int num_lateral_flow_nash_reservoirs;
-    
-    //LKC: added N_nash the same way as the other Nash parameters - making this consistent
     double K_lf;
-    double K_nash;   
-    int N_nash;
+    double K_nash_subsurface;
+    int N_nash_subsurface;
 
     int num_giuh_ordinates;
 
+    int surface_runoff_scheme;   // options: giuh-based runoff and nash cascade-based runoff
+
+    double nwm_ponded_depth_m;
     // ***********************************************************
     // ******************* Dynamic allocations *******************
     // ***********************************************************
@@ -100,15 +98,12 @@ struct cfe_state_struct {
     //result_fluxes* fluxes;
 
     double* giuh_ordinates;
-    double* nash_storage;
+    double* nash_storage_subsurface;
     double* runoff_queue_m_per_timestep;
 
-    /* xinanjiang_dev
-        changing the name to the more general "direct runoff"
-    double* flux_Schaake_output_runoff_m;*/
-    double* flux_output_direct_runoff_m ;
+    struct nash_cascade_parameters nash_surface_params;
 
-    double* flux_giuh_runoff_m;
+    double* flux_direct_runoff_m;
     double* flux_nash_lateral_runoff_m;
     double* flux_from_deep_gw_to_chan_m;
     double* flux_perc_m;
@@ -116,6 +111,9 @@ struct cfe_state_struct {
     double* flux_Qout_m;
 
     int verbosity;
+
+    char* serialized;
+    uint64_t serialized_length; // needs a permanent anchor for get_value_ptr
 
 };
 typedef struct cfe_state_struct cfe_state_struct;
@@ -137,13 +135,13 @@ extern void get_word_cfe(char *theString,int *start,int *end,char *theWord,int *
 
 /*int read_init_config_cfe(const char* config_file, cfe_state_struct* model, double* alpha_fc, double* soil_storage,
                      int* is_soil_storage_ratio);*/
-//LKC removed double alpha_fc since it has been added to the soil parameter structure                     
+//LKC removed double alpha_fc since it has been added to the soil parameter structure
 int read_init_config_cfe(const char* config_file, cfe_state_struct* model);
 
 
 /*extern void init_soil_reservoir(cfe_state_struct* cfe_ptr, double alpha_fc, double max_storage, double storage,
                      int is_storage_ratios);*/
-//LKC removed double alpha_fc since it has been added to the soil parameter structure                 
+//LKC removed double alpha_fc since it has been added to the soil parameter structure
 extern void init_soil_reservoir(cfe_state_struct* cfe_ptr);
 
 //extern double init_reservoir_storage(int is_ratio, double amount, double max_amount);
