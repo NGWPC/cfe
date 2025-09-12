@@ -320,8 +320,8 @@ static const char *input_var_units[INPUT_VAR_NAME_COUNT] = {
         "mm h-1", //"atmosphere_water__liquid_equivalent_precipitation_rate"
         "m s-1",   //"water_potential_evaporation_flux"
 	"m",    // ice fraction in meters
-	"none",     // ice fraction [-]
-	"none" // soil moisture profile is in decimal fraction -rlm
+	"1",     // ice fraction [-]
+	"1" // soil moisture profile is in decimal fraction -rlm
 };
 
 static const int input_var_item_count[INPUT_VAR_NAME_COUNT] = {
