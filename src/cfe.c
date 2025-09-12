@@ -244,7 +244,12 @@ extern void cfe(
   if(flux_from_deep_gw_to_chan_m >  gw_reservoir_struct->storage_m)  {
   flux_from_deep_gw_to_chan_m=gw_reservoir_struct->storage_m;
   // TODO: set a flag when flux larger than storage
-  Log(WARNING, "Groundwater flux larger than storage \n");
+  // Adding specific warning message requested by OWP (9/11/2025)
+  Log(WARNING,
+    "Groundwater flux larger than storage. "
+    "While this will not cause a run failure, "
+    "parameter combinations may not be realistic "
+    "and a mass balance error will occur.\n");
   }
  
   massbal_struct->vol_from_gw+=flux_from_deep_gw_to_chan_m;
