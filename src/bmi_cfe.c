@@ -319,7 +319,7 @@ static const char *input_var_types[INPUT_VAR_NAME_COUNT] = {
 static const char *input_var_units[INPUT_VAR_NAME_COUNT] = {
         "mm h-1", //"atmosphere_water__liquid_equivalent_precipitation_rate"
         "m s-1",   //"water_potential_evaporation_flux"
-	"m",    // ice fraction in meters
+	"1",    // ice fraction should be dimensionless
 	"1",     // ice fraction [-]
 	"1" // soil moisture profile is in decimal fraction -rlm
 };
