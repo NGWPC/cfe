@@ -259,7 +259,7 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
       	"m",
 	    "m",
 	    "m",
-	    "none",
+	    "1",
 	    "m"
 };
 
