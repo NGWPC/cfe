@@ -1,8 +1,11 @@
 #include "cfe.h"
 #include "logger.h"
+#include <stdbool.h>
 
 #define max(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b);  _a > _b ? _a : _b; })
 #define min(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b);  _a < _b ? _a : _b; })
+
+static bool groundwaterFluxIssueLogged = false;
 
 // CFE STATE SPACE FUNCTION // #######################################################################
 // Adapted version of Conceptual Functional Equivalent model re-written in state-space form July, 2021
@@ -242,14 +245,17 @@ extern void cfe(
   
   flux_from_deep_gw_to_chan_m=primary_flux;  // m/h   <<<<<<<<<< BASE FLOW FLUX >>>>>>>>>
   if(flux_from_deep_gw_to_chan_m >  gw_reservoir_struct->storage_m)  {
-  flux_from_deep_gw_to_chan_m=gw_reservoir_struct->storage_m;
-  // TODO: set a flag when flux larger than storage
-  // Adding specific warning message requested by OWP (9/11/2025)
-  Log(WARNING,
-    "Groundwater flux larger than storage. "
-    "While this will not cause a run failure, "
-    "parameter combinations may not be realistic "
-    "and a mass balance error will occur.\n");
+    flux_from_deep_gw_to_chan_m=gw_reservoir_struct->storage_m;
+    // TODO: set a flag when flux larger than storage
+    // Adding specific warning message requested by OWP (9/11/2025)
+    if (!groundwaterFluxIssueLogged) {
+        Log(WARNING,
+            "Groundwater flux larger than storage. "
+            "While this will not cause a run failure, "
+            "parameter combinations may not be realistic "
+            "and a mass balance error will occur.\n");
+        groundwaterFluxIssueLogged = true;
+    }
   }
  
   massbal_struct->vol_from_gw+=flux_from_deep_gw_to_chan_m;
