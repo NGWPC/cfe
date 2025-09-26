@@ -1628,6 +1628,9 @@ static int Get_var_type (Bmi *self, const char *name, char * type)
     if (strcmp(name, "serialization_create") == 0) {
         strncpy(type, "uint64_t", BMI_MAX_TYPE_NAME);
         return BMI_SUCCESS;
+    } else if (strcmp(name, "serialization_size") == 0) {
+        strncpy(type, "uint64_t", BMI_MAX_TYPE_NAME);
+        return BMI_SUCCESS;
     } else if (strcmp(name, "serialization_state") == 0) {
         strncpy(type, "char", BMI_MAX_TYPE_NAME);
         return BMI_SUCCESS;
@@ -1737,7 +1740,7 @@ static int Get_var_units (Bmi *self, const char *name, char * units)
 static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
 {
     // serialization
-    if (strcmp(name, "serialization_create") == 0) {
+    if (strcmp(name, "serialization_create") == 0 || strcmp(name, "serialization_size") == 0) {
         *nbytes = sizeof(uint64_t);
         return BMI_SUCCESS;
     } else if (strcmp(name, "serialization_state") == 0) {
@@ -2046,14 +2049,12 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
     /***********************************************************/
     /********    SERIALIZATION    ******************************/
     /***********************************************************/
-    if (strcmp(name, "serialization_create") == 0) {
-        int result = new_serialized_cfe(self);
-        if (result == BMI_SUCCESS) {
-            cfe_state_struct* model = (cfe_state_struct*)self->data;
-            *dest = &model->serialized_length;
-            return BMI_SUCCESS;
-        }
-        return BMI_FAILURE;
+    if (strcmp(name, "serialization_size") == 0) {
+        cfe_state_struct* model = (cfe_state_struct*)self->data;
+        if (model->serialized == NULL)
+            return BMI_FAILURE;
+        *dest = (void*)&model->serialized_length;
+        return BMI_SUCCESS;
     }
     if (strcmp(name, "serialization_state") == 0) {
         cfe_state_struct* model = (cfe_state_struct*)self->data;
@@ -2103,14 +2104,6 @@ static int Get_value_at_indices (Bmi *self, const char *name, void *dest, int *i
 static int Get_value (Bmi *self, const char *name, void *dest)
 {
     // special cases for serialization
-    if (strcmp(name, "serialization_create") == 0) {
-        void* ptr;
-        int result = Get_value_ptr(self, name, &ptr); // run this to create a new save state
-        if (result != BMI_SUCCESS)
-            return BMI_FAILURE;
-        memcpy(dest, ptr, sizeof(uint64_t));
-        return BMI_SUCCESS;
-    }
     if (strcmp(name, "serialization_state") == 0) {
         cfe_state_struct* model = (cfe_state_struct*)self->data;
         if (model->serialized != NULL) {
@@ -2161,6 +2154,8 @@ static int Set_value (Bmi *self, const char *name, void *src)
     // serialization
     if (strcmp(name, "serialization_state") == 0) {
         return load_serialized_cfe(self, (char*)src);
+    } else if (strcmp(name, "serialization_create") == 0) {
+        return new_serialized_cfe(self);
     } else if (strcmp(name, "serialization_free") == 0) {
         return free_serialized_cfe(self);
     }
