@@ -2115,6 +2115,7 @@ static int Get_value (Bmi *self, const char *name, void *dest)
         cfe_state_struct* model = (cfe_state_struct*)self->data;
         if (model->serialized != NULL) {
             memcpy(dest, &model->serialized_length, sizeof(uint64_t));
+            uint64_t *set_value = (uint64_t *)dest;
             return BMI_SUCCESS;
         }
         return BMI_FAILURE;
