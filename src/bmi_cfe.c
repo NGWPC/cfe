@@ -2111,6 +2111,13 @@ static int Get_value (Bmi *self, const char *name, void *dest)
             return BMI_SUCCESS;
         }
         return BMI_FAILURE;
+    } else if (strcmp(name, "serialization_size") == 0) {
+        cfe_state_struct* model = (cfe_state_struct*)self->data;
+        if (model->serialized != NULL) {
+            memcpy(dest, &model->serialized_length, sizeof(uint64_t));
+            return BMI_SUCCESS;
+        }
+        return BMI_FAILURE;
     }
 
     // Use nested call to "by index" version
