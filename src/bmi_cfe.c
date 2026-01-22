@@ -1637,6 +1637,9 @@ static int Get_var_type (Bmi *self, const char *name, char * type)
     } else if (strcmp(name, "serialization_free") == 0) {
         strncpy(type, "int", BMI_MAX_TYPE_NAME);
         return BMI_SUCCESS;
+    } else if (strcmp(name, "reset_time")) {
+        strncpy(type, "double", BMI_MAX_TYPE_NAME);
+        return BMI_SUCCESS;
     }
 
     // If we get here, it means the variable name wasn't recognized
@@ -1751,6 +1754,9 @@ static int Get_var_nbytes (Bmi *self, const char *name, int * nbytes)
         return BMI_SUCCESS;
     } else if (strcmp(name, "serialization_free") == 0) {
         *nbytes = sizeof(int);
+        return BMI_SUCCESS;
+    } else if (strcmp(name, "reset_time") == 0) {
+        *nbytes = sizeof(double);
         return BMI_SUCCESS;
     }
     int item_size;
@@ -2165,6 +2171,11 @@ static int Set_value (Bmi *self, const char *name, void *src)
         return new_serialized_cfe(self);
     } else if (strcmp(name, "serialization_free") == 0) {
         return free_serialized_cfe(self);
+    } else if (strcmp(name, "reset_time") == 0) {
+        cfe_state_struct *model = (cfe_state_struct *)self->data;
+        // time step only used for indexing into forcing data during update
+        model->current_time_step = 0;
+        return BMI_SUCCESS;
     }
     // Avoid using set value, call instead set_value_at_index
     // Use nested call to "by index" version
