@@ -1176,6 +1176,8 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     else {
       model->soil_reservoir.is_aet_rootzone = FALSE;
       model->soil_reservoir.n_soil_layers   = 1;
+      model->soil_reservoir.soil_layer_depths_m = NULL;
+      model->soil_reservoir.delta_soil_layer_depth_m = NULL;
     }
 
     /*--------------------END OF ROOT ZONE ADJUSTED AET DEVELOPMENT -rlm ------------------------------*/
@@ -1367,6 +1369,11 @@ static int Initialize (Bmi *self, const char *file)
     cfe_bmi_data_ptr->gw_reservoir.coeff_secondary = 0.0;                // 0.0 means that secondary outlet is not applied
     cfe_bmi_data_ptr->gw_reservoir.exponent_secondary = 1.0;             // linear
 
+    // Not used in gw reservoir
+    cfe_bmi_data_ptr->gw_reservoir.smc_profile = NULL;
+    cfe_bmi_data_ptr->gw_reservoir.soil_layer_depths_m = NULL;
+    cfe_bmi_data_ptr->gw_reservoir.delta_soil_layer_depth_m = NULL;
+
     // Initialize soil conceptual reservoirs
     //LKC Remove alpha_fc
     init_soil_reservoir(cfe_bmi_data_ptr);
@@ -1512,7 +1519,10 @@ static int Finalize (Bmi *self)
             free(model->forcing_data_precip_kg_per_m2);
         if( model->forcing_data_time != NULL )
             free(model->forcing_data_time);
-        
+        if( model->forcing_file != NULL ){
+            free(model->forcing_file);
+        }
+
         if( model->giuh_ordinates != NULL )
             free(model->giuh_ordinates);
         if( model->nash_storage_subsurface != NULL )
@@ -1521,7 +1531,10 @@ static int Finalize (Bmi *self)
             free(model->runoff_queue_m_per_timestep);
         if( model->flux_Qout_m != NULL )
             free(model->flux_Qout_m);
-        
+
+        if( model->soil_reservoir.smc_profile != NULL )
+            free(model->soil_reservoir.smc_profile);
+
         /* xinanjiang_dev: changing name to the more general "direct runoff"
         if( model->flux_Schaake_output_runoff_m != NULL )
             free(model->flux_Schaake_output_runoff_m);*/
@@ -3187,6 +3200,7 @@ extern void init_soil_reservoir(cfe_state_struct* cfe_ptr)
 }*/
 
 extern void initialize_volume_trackers(cfe_state_struct* cfe_ptr) {
+    cfe_ptr->vol_struct.volstart         = 0.0;
     cfe_ptr->vol_struct.volin            = 0;
     cfe_ptr->vol_struct.vol_runoff       = 0;
     cfe_ptr->vol_struct.vol_infilt       = 0;
