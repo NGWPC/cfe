@@ -3027,6 +3027,27 @@ cfe_state_struct *new_bmi_cfe(void)
     data = (cfe_state_struct *) calloc(1, sizeof(cfe_state_struct));
     data->time_step_size                = 3600;
     data->time_step_fraction            = 1.0;
+    // NJF Ensure that all "optional" pointers are initialized to NULL
+    // Should probabably ensure that *all* pointers are initialized to NULL
+    // but that would require some more significant refactoring...
+    data->soil_reservoir.smc_profile = NULL;
+    data->soil_reservoir.soil_layer_depths_m = NULL;
+    data->soil_reservoir.delta_soil_layer_depth_m = NULL;
+    data->nash_surface_params.nash_storage = NULL;
+    data->forcing_file = NULL;
+    
+    data->forcing_data_precip_kg_per_m2 = NULL;
+    data->forcing_data_time             = NULL;
+    data->giuh_ordinates                = NULL;
+    data->nash_storage_subsurface       = NULL;
+    data->runoff_queue_m_per_timestep   = NULL;
+    data->flux_Qout_m                   = NULL;
+    data->infiltration_excess_m         = NULL;
+    data->flux_from_deep_gw_to_chan_m   = NULL;
+    data->flux_direct_runoff_m          = NULL;
+    data->flux_lat_m                    = NULL;
+    data->flux_nash_lateral_runoff_m    = NULL;
+    data->flux_perc_m                   = NULL;
 
     return data;
 }
