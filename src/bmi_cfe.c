@@ -23,7 +23,7 @@
 #define CFE_DEBUG 0
 
 #define INPUT_VAR_NAME_COUNT 5
-#define OUTPUT_VAR_NAME_COUNT 15
+#define OUTPUT_VAR_NAME_COUNT 16
 
 #define STATE_VAR_NAME_COUNT 95   // must match var_info array size
 
@@ -206,7 +206,8 @@ static const char *output_var_names[OUTPUT_VAR_NAME_COUNT] = {
         "SOIL_STORAGE",
         "SOIL_STORAGE_CHANGE",
         "SURF_RUNOFF_SCHEME",
-	    "NWM_PONDED_DEPTH"
+	"NWM_PONDED_DEPTH",
+	"atmosphere_water__liquid_equivalent_precipitation_rate_out"
 };
 
 static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
@@ -224,6 +225,7 @@ static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
 	    "double",
         "double",
 	    "int",
+	    "double",
 	    "double"
 };
 
@@ -240,6 +242,7 @@ static const int output_var_item_count[OUTPUT_VAR_NAME_COUNT] = {
         1,
         1,
         1,
+	    1,
 	    1,
 	    1,
 	    1
@@ -260,7 +263,8 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
 	    "m",
 	    "m",
 	    "1",
-	    "m"
+	    "m",
+	    "mm h-1"
 };
 
 static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
@@ -278,7 +282,8 @@ static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
         0,
         0,
         0,
-        0
+        0,
+	0
 };
 
 static const char *output_var_locations[OUTPUT_VAR_NAME_COUNT] = {
@@ -296,7 +301,9 @@ static const char *output_var_locations[OUTPUT_VAR_NAME_COUNT] = {
         "node",
 	"node",
 	"none",
-	"node"
+	"node",
+        "node"
+
 };
 
 // Don't forget to update Get_value/Get_value_at_indices (and setter) implementation if these are adjusted
@@ -2026,6 +2033,14 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
       *dest = (void*)&cfe_ptr->nwm_ponded_depth_m;
       return BMI_SUCCESS;
     }
+
+    if (strcmp(name, "atmosphere_water__liquid_equivalent_precipitation_rate_out") == 0) {
+      cfe_state_struct *cfe_ptr;
+      cfe_ptr = (cfe_state_struct *) self->data;
+      *dest = (void*)&cfe_ptr->aorc.precip_kg_per_m2;
+      return BMI_SUCCESS;
+    }
+
     /***********************************************************/
     /***********    INPUT    ***********************************/
     /***********************************************************/
