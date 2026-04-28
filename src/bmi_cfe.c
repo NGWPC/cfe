@@ -254,7 +254,7 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
         "m",
         "m",
         "m",
-        "m",
+        "m3 s-1",
         "m",
         "m",
         "m",
@@ -1978,6 +1978,19 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
     }
 
     if (strcmp (name, "DEEP_GW_TO_CHANNEL_FLUX") == 0) {
+        cfe_state_struct *cfe_ptr;
+        cfe_ptr = (cfe_state_struct *) self->data;
+
+        cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s =
+            (*(cfe_ptr->flux_from_deep_gw_to_chan_m) *
+             cfe_ptr->catchment_area_m2) /
+            (double)cfe_ptr->time_step_size;
+
+        *dest = (void *)&cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s;
+        return BMI_SUCCESS;
+    }
+
+    if (strcmp (name, "DEEP_GW_TO_CHANNEL_FLUX") == 0) {
         *dest = (void *) ((cfe_state_struct *)(self->data))->flux_from_deep_gw_to_chan_m;
         return BMI_SUCCESS;
     }
@@ -3042,13 +3055,14 @@ int read_file_line_counts_cfe(const char* file_name, int* line_count, int* max_l
     return 0;
 }
 
-
 cfe_state_struct *new_bmi_cfe(void)
 {
     cfe_state_struct *data;
     data = (cfe_state_struct *) calloc(1, sizeof(cfe_state_struct));
     data->time_step_size                = 3600;
     data->time_step_fraction            = 1.0;
+    data->flux_from_deep_gw_to_chan_m3_per_s = 0.0;
+    data->catchment_area_m2             = 1.0;
 
     return data;
 }
