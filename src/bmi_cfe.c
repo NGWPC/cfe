@@ -23,7 +23,7 @@
 #define CFE_DEBUG 0
 
 #define INPUT_VAR_NAME_COUNT 5
-#define OUTPUT_VAR_NAME_COUNT 16
+#define OUTPUT_VAR_NAME_COUNT 17
 
 #define STATE_VAR_NAME_COUNT 95   // must match var_info array size
 
@@ -207,7 +207,8 @@ static const char *output_var_names[OUTPUT_VAR_NAME_COUNT] = {
         "SOIL_STORAGE_CHANGE",
         "SURF_RUNOFF_SCHEME",
 	"NWM_PONDED_DEPTH",
-	"atmosphere_water__liquid_equivalent_precipitation_rate_out"
+	"atmosphere_water__liquid_equivalent_precipitation_rate_out",
+	"DEEP_GW_TO_CHANNEL_FLUX_M3_PER_S",
 };
 
 static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
@@ -225,6 +226,7 @@ static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
 	    "double",
         "double",
 	    "int",
+	    "double",
 	    "double",
 	    "double"
 };
@@ -245,6 +247,7 @@ static const int output_var_item_count[OUTPUT_VAR_NAME_COUNT] = {
 	    1,
 	    1,
 	    1,
+	    1,
 	    1
 };
 
@@ -254,7 +257,7 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
         "m",
         "m",
         "m",
-        "m3 s-1",
+        "m",
         "m",
         "m",
         "m",
@@ -264,7 +267,8 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
 	    "m",
 	    "1",
 	    "m",
-	    "mm h-1"
+	    "mm h-1",
+	    "m3 s-1"
 };
 
 static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
@@ -283,6 +287,7 @@ static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
         0,
         0,
         0,
+	0,
 	0
 };
 
@@ -302,7 +307,8 @@ static const char *output_var_locations[OUTPUT_VAR_NAME_COUNT] = {
 	"node",
 	"none",
 	"node",
-        "node"
+        "node",
+	"node"
 
 };
 
@@ -1978,6 +1984,11 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
     }
 
     if (strcmp (name, "DEEP_GW_TO_CHANNEL_FLUX") == 0) {
+        *dest = (void *) ((cfe_state_struct *)(self->data))->flux_from_deep_gw_to_chan_m;
+        return BMI_SUCCESS;
+    }
+
+    if (strcmp (name, "DEEP_GW_TO_CHANNEL_FLUX_M3_PER_S") == 0) {
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
 
@@ -1987,11 +1998,6 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
             (double)cfe_ptr->time_step_size;
 
         *dest = (void *)&cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s;
-        return BMI_SUCCESS;
-    }
-
-    if (strcmp (name, "DEEP_GW_TO_CHANNEL_FLUX") == 0) {
-        *dest = (void *) ((cfe_state_struct *)(self->data))->flux_from_deep_gw_to_chan_m;
         return BMI_SUCCESS;
     }
 
