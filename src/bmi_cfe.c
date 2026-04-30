@@ -208,7 +208,7 @@ static const char *output_var_names[OUTPUT_VAR_NAME_COUNT] = {
         "SURF_RUNOFF_SCHEME",
 	"NWM_PONDED_DEPTH",
 	"atmosphere_water__liquid_equivalent_precipitation_rate_out",
-	"DEEP_GW_TO_CHANNEL_FLUX_M3_PER_S",
+	"DEEP_GW_TO_CHANNEL_FLUX_M3_PER_S"
 };
 
 static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
