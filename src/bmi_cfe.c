@@ -2008,10 +2008,17 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
         cfe_state_struct *cfe_ptr;
         cfe_ptr = (cfe_state_struct *) self->data;
 
-        cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s =
-            (*(cfe_ptr->flux_from_deep_gw_to_chan_m) *
-             cfe_ptr->catchment_area_m2) /
-            (double)cfe_ptr->time_step_size;
+        if (cfe_ptr->flux_from_deep_gw_to_chan_m != NULL &&
+            cfe_ptr->catchment_area_m2 > 0.0 &&
+            cfe_ptr->time_step_size > 0) {
+            cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s =
+                (*(cfe_ptr->flux_from_deep_gw_to_chan_m) *
+                 cfe_ptr->catchment_area_m2) /
+                (double)cfe_ptr->time_step_size;
+        }
+        else {
+            cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s = 0.0;
+        }
 
         *dest = (void *)&cfe_ptr->flux_from_deep_gw_to_chan_m3_per_s;
         return BMI_SUCCESS;
@@ -3091,8 +3098,8 @@ cfe_state_struct *new_bmi_cfe(void)
     data->time_step_size                = 3600;
     data->time_step_fraction            = 1.0;
     data->flux_from_deep_gw_to_chan_m3_per_s = 0.0;
-    data->catchment_area_m2             = 1.0;
     data->sfcrnoff_accum_m               = 0.0;
+    data->catchment_area_m2             = 0.0;
 
     return data;
 }
