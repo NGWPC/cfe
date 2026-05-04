@@ -1309,7 +1309,7 @@ static int Initialize (Bmi *self, const char *file)
     //This needs an initial value, it is used in computations in CFE and only set towards the end of the model
     //See issue #31
     *cfe_bmi_data_ptr->flux_perc_m = 0.0;
-    //cfe_bmi_data_ptr->sfcrnoff_accum_m = malloc(sizeof(double));
+    /* sfcrnoff_accum_m is a scalar (not a pointer), so no allocation is needed */
     cfe_bmi_data_ptr->sfcrnoff_accum_m = 0.0;
 
 
