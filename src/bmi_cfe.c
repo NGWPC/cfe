@@ -23,7 +23,7 @@
 #define CFE_DEBUG 0
 
 #define INPUT_VAR_NAME_COUNT 5
-#define OUTPUT_VAR_NAME_COUNT 17
+#define OUTPUT_VAR_NAME_COUNT 18
 
 #define STATE_VAR_NAME_COUNT 95   // must match var_info array size
 
@@ -208,7 +208,8 @@ static const char *output_var_names[OUTPUT_VAR_NAME_COUNT] = {
         "SURF_RUNOFF_SCHEME",
 	"NWM_PONDED_DEPTH",
 	"atmosphere_water__liquid_equivalent_precipitation_rate_out",
-	"DEEP_GW_TO_CHANNEL_FLUX_M3_PER_S"
+	"DEEP_GW_TO_CHANNEL_FLUX_M3_PER_S",
+	"SFCRNOFF",
 };
 
 static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
@@ -228,6 +229,7 @@ static const char *output_var_types[OUTPUT_VAR_NAME_COUNT] = {
 	    "int",
 	    "double",
 	    "double",
+	    "double",
 	    "double"
 };
 
@@ -244,6 +246,7 @@ static const int output_var_item_count[OUTPUT_VAR_NAME_COUNT] = {
         1,
         1,
         1,
+	    1,
 	    1,
 	    1,
 	    1,
@@ -268,7 +271,8 @@ static const char *output_var_units[OUTPUT_VAR_NAME_COUNT] = {
 	    "1",
 	    "m",
 	    "mm h-1",
-	    "m3 s-1"
+	    "m3 s-1",
+	    "m"
 };
 
 static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
@@ -287,6 +291,7 @@ static const int output_var_grids[OUTPUT_VAR_NAME_COUNT] = {
         0,
         0,
         0,
+	0,
 	0,
 	0
 };
@@ -308,6 +313,7 @@ static const char *output_var_locations[OUTPUT_VAR_NAME_COUNT] = {
 	"none",
 	"node",
         "node",
+	"node",
 	"node"
 
 };
@@ -1303,6 +1309,8 @@ static int Initialize (Bmi *self, const char *file)
     //This needs an initial value, it is used in computations in CFE and only set towards the end of the model
     //See issue #31
     *cfe_bmi_data_ptr->flux_perc_m = 0.0;
+    /* sfcrnoff_accum_m is a scalar (not a pointer), so no allocation is needed */
+    cfe_bmi_data_ptr->sfcrnoff_accum_m = 0.0;
 
 
     /*******************************************************
@@ -1462,7 +1470,15 @@ static int Update (Bmi *self)
     cfe_ptr->vol_struct.volin += cfe_ptr->timestep_rainfall_input_m;
     
     run_cfe(cfe_ptr);
-        
+
+    /* Accumulated surface runoff depth for NWM SFCRNOFF.
+     * Using direct runoff only; not including Nash lateral flow unless confirmed.
+     */
+
+    if (cfe_ptr->flux_direct_runoff_m != NULL) {
+      cfe_ptr->sfcrnoff_accum_m += *(cfe_ptr->flux_direct_runoff_m);
+    }
+
     // Advance the model time 
     cfe_ptr->current_time_step += 1;
 
@@ -2073,6 +2089,13 @@ static int Get_value_ptr (Bmi *self, const char *name, void **dest)
       *dest = (void*)&cfe_ptr->aorc.precip_kg_per_m2;
       return BMI_SUCCESS;
     }
+
+    if (strcmp(name, "SFCRNOFF") == 0) {
+      cfe_state_struct *cfe_ptr;
+      cfe_ptr = (cfe_state_struct *) self->data;
+      *dest = (void *)&cfe_ptr->sfcrnoff_accum_m;
+      return BMI_SUCCESS;
+}
 
     /***********************************************************/
     /***********    INPUT    ***********************************/
@@ -3075,6 +3098,7 @@ cfe_state_struct *new_bmi_cfe(void)
     data->time_step_size                = 3600;
     data->time_step_fraction            = 1.0;
     data->flux_from_deep_gw_to_chan_m3_per_s = 0.0;
+    data->sfcrnoff_accum_m               = 0.0;
     data->catchment_area_m2             = 0.0;
 
     return data;
