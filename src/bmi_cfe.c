@@ -981,6 +981,8 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     }
     
     // compute gw storage in meters
+    static int gw_bad_param_warned = 0;
+
     if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
         if (!isfinite(model->gw_reservoir.gw_storage) ||
             !isfinite(model->gw_reservoir.storage_max_m) ||
@@ -989,15 +991,26 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             model->gw_reservoir.gw_storage < 0.0 ||
             model->gw_reservoir.storage_max_m <= 0.0) {
 
-            Log(WARNING,
-                "Invalid CFE groundwater reservoir parameters from config; "
-                "disabling groundwater reservoir and setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
-                "gw_storage=%lf, max_gw_storage=%lf, Cgw=%lf, expon=%lf. "
-                "This is likely an upstream NHF parameter-generation issue.\n",
-                model->gw_reservoir.gw_storage,
-                model->gw_reservoir.storage_max_m,
-                model->gw_reservoir.coeff_primary,
-                model->gw_reservoir.exponent_primary);
+            if (gw_bad_param_warned == 0) {
+                Log(WARNING,
+                    "Invalid CFE groundwater reservoir parameters from config; "
+                    "disabling groundwater reservoir and setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
+                    "gw_storage=%lf, max_gw_storage=%lf, Cgw=%lf, expon=%lf. "
+                    "This is likely an upstream NHF parameter-generation issue.\n",
+                    model->gw_reservoir.gw_storage,
+                    model->gw_reservoir.storage_max_m,
+                    model->gw_reservoir.coeff_primary,
+                    model->gw_reservoir.exponent_primary);
+
+                gw_bad_param_warned = 1;
+            }
+            else if (gw_bad_param_warned == 1) {
+                Log(WARNING,
+                    "Invalid CFE groundwater reservoir parameters occurred again; "
+                    "further warnings suppressed.\n");
+
+                gw_bad_param_warned = 2;
+            }
 
             model->gw_reservoir.gw_storage = 0.0;
             model->gw_reservoir.storage_max_m = 0.0;
