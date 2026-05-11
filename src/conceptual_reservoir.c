@@ -1,6 +1,8 @@
 #ifndef _CONCEPTUAL_RESERVOIR_C
 #define _CONCEPTUAL_RESERVOIR_C
 
+#include <math.h>
+#include "logger.h"
 #include "conceptual_reservoir.h"
 
 
@@ -40,20 +42,62 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
   // *****************************************************************************
   // ------------------ Conceptual Ground Water Reservoir -------------------------
   // single outlet reservoir like the NWM V1.2 exponential conceptual gw reservoir
-  if (da_reservoir->is_exponential == TRUE) { 
+  if (da_reservoir->is_exponential == TRUE) {
+    *primary_flux_m = 0.0;
+    *secondary_flux_m = 0.0;
+
+    if (!isfinite(da_reservoir->storage_m) ||
+        !isfinite(da_reservoir->storage_max_m) ||
+        !isfinite(da_reservoir->coeff_primary) ||
+        !isfinite(da_reservoir->exponent_primary) ||
+        da_reservoir->storage_m <= 0.0 ||
+        da_reservoir->storage_max_m <= 0.0) {
+
+      Log(WARNING,
+          "Invalid CFE groundwater reservoir state or parameters; "
+          "setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
+          "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf.\n",
+          da_reservoir->storage_m,
+          da_reservoir->storage_max_m,
+          da_reservoir->coeff_primary,
+          da_reservoir->exponent_primary);
+
+      if (!isfinite(da_reservoir->storage_m) ||
+          da_reservoir->storage_m < 0.0) {
+        da_reservoir->storage_m = 0.0;
+      }
+
+      return;
+    }
+
     // calculate the one flux and return.
     double exp_term = exp(da_reservoir->exponent_primary * da_reservoir->storage_m / da_reservoir->storage_max_m);
-    
-    *primary_flux_m = da_reservoir->coeff_primary * (exp_term - 1.0);
-    *secondary_flux_m = 0.0;
+    double calculated_flux_m = da_reservoir->coeff_primary * (exp_term - 1.0);
+
+    if (!isfinite(calculated_flux_m) || calculated_flux_m < 0.0) {
+      Log(WARNING,
+          "Invalid CFE groundwater flux calculation; "
+          "setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
+          "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf, raw_flux=%lf.\n",
+          da_reservoir->storage_m,
+          da_reservoir->storage_max_m,
+          da_reservoir->coeff_primary,
+          da_reservoir->exponent_primary,
+          calculated_flux_m);
+
+      return;
+    }
+
+    *primary_flux_m = calculated_flux_m;
 
     // cap so flux never exceeds storage, but commented out here per OWP request (9/11/2025)
     //if (*primary_flux_m > da_reservoir->storage_m) {
     //    *primary_flux_m = da_reservoir->storage_m;
     //}
-    
+
     return;
   }
+
   // *****************************************************************************
   
   // code goes past here iff it is not a single outlet exponential deep groundwater reservoir of the NWM variety

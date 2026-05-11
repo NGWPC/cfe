@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -979,9 +980,36 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         return BMI_FAILURE;
     }
     
-    // compute gw storage in meters	
+    // compute gw storage in meters
     if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
-        model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m;
+        if (!isfinite(model->gw_reservoir.gw_storage) ||
+            !isfinite(model->gw_reservoir.storage_max_m) ||
+            !isfinite(model->gw_reservoir.coeff_primary) ||
+            !isfinite(model->gw_reservoir.exponent_primary) ||
+            model->gw_reservoir.gw_storage < 0.0 ||
+            model->gw_reservoir.storage_max_m <= 0.0) {
+
+            Log(WARNING,
+                "Invalid CFE groundwater reservoir parameters from config; "
+                "disabling groundwater reservoir and setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
+                "gw_storage=%lf, max_gw_storage=%lf, Cgw=%lf, expon=%lf. "
+                "This is likely an upstream NHF parameter-generation issue.\n",
+                model->gw_reservoir.gw_storage,
+                model->gw_reservoir.storage_max_m,
+                model->gw_reservoir.coeff_primary,
+                model->gw_reservoir.exponent_primary);
+
+            model->gw_reservoir.gw_storage = 0.0;
+            model->gw_reservoir.storage_max_m = 0.0;
+            model->gw_reservoir.storage_m = 0.0;
+            model->gw_reservoir.coeff_primary = 0.0;
+            model->gw_reservoir.exponent_primary = 1.0;
+        }
+        else {
+            model->gw_reservoir.storage_m =
+                model->gw_reservoir.gw_storage *
+                model->gw_reservoir.storage_max_m;
+        }
     }
 
     if (is_num_timesteps_set == FALSE && strcmp(model->forcing_file, "BMI")) {
