@@ -1,7 +1,6 @@
 #ifndef _CONCEPTUAL_RESERVOIR_C
 #define _CONCEPTUAL_RESERVOIR_C
 
-#include <math.h>
 #include "logger.h"
 #include "conceptual_reservoir.h"
 
@@ -56,28 +55,23 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
         da_reservoir->storage_max_m <= 0.0) {
 
       if (gw_bad_state_warned == 0) {
-          Log(WARNING,
-              "Invalid CFE groundwater reservoir state or parameters; "
-              "setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
-              "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf.\n",
-              da_reservoir->storage_m,
-              da_reservoir->storage_max_m,
-              da_reservoir->coeff_primary,
-              da_reservoir->exponent_primary);
+        Log(WARNING,
+            "Invalid CFE groundwater reservoir state or parameters during flux calculation; "
+            "returning zero groundwater flux for this timestep. "
+            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf.\n",
+            da_reservoir->storage_m,
+            da_reservoir->storage_max_m,
+            da_reservoir->coeff_primary,
+            da_reservoir->exponent_primary);
 
-          gw_bad_state_warned = 1;
+        gw_bad_state_warned = 1;
       }
       else if (gw_bad_state_warned == 1) {
-          Log(WARNING,
-              "Invalid CFE groundwater reservoir state or parameters occurred again; "
-              "further warnings suppressed.\n");
+        Log(WARNING,
+            "Invalid CFE groundwater reservoir state or parameters occurred again; "
+            "further warnings suppressed.\n");
 
-          gw_bad_state_warned = 2;
-      }
-
-      if (!isfinite(da_reservoir->storage_m) ||
-          da_reservoir->storage_m < 0.0) {
-        da_reservoir->storage_m = 0.0;
+        gw_bad_state_warned = 2;
       }
 
       return;
@@ -88,15 +82,28 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
     double calculated_flux_m = da_reservoir->coeff_primary * (exp_term - 1.0);
 
     if (!isfinite(calculated_flux_m) || calculated_flux_m < 0.0) {
-      Log(WARNING,
-          "Invalid CFE groundwater flux calculation; "
-          "setting DEEP_GW_TO_CHANNEL_FLUX to 0. "
-          "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf, raw_flux=%lf.\n",
-          da_reservoir->storage_m,
-          da_reservoir->storage_max_m,
-          da_reservoir->coeff_primary,
-          da_reservoir->exponent_primary,
-          calculated_flux_m);
+      static int gw_bad_flux_warned = 0;
+
+      if (gw_bad_flux_warned == 0) {
+        Log(WARNING,
+            "Invalid CFE groundwater flux calculation; "
+            "returning zero groundwater flux for this timestep. "
+            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf, raw_flux=%lf.\n",
+            da_reservoir->storage_m,
+            da_reservoir->storage_max_m,
+            da_reservoir->coeff_primary,
+            da_reservoir->exponent_primary,
+            calculated_flux_m);
+
+        gw_bad_flux_warned = 1;
+      }
+      else if (gw_bad_flux_warned == 1) {
+        Log(WARNING,
+            "Invalid CFE groundwater flux calculation occurred again; "
+            "further warnings suppressed.\n");
+
+        gw_bad_flux_warned = 2;
+      }
 
       return;
     }
