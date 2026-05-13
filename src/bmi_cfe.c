@@ -2315,27 +2315,28 @@ static int Set_value (Bmi *self, const char *name, void *src)
     if (self->get_var_nbytes(self, name, &nbytes) == BMI_FAILURE)
         return BMI_FAILURE;
 
+    if (strcmp(name, "water_potential_evaporation_flux") == 0) {
+        double potential_et_m_per_s = *((double*)src);
+
+        if (!isfinite(potential_et_m_per_s) ||
+            potential_et_m_per_s < 0.0) {
+            Log(FATAL,
+                "Invalid water_potential_evaporation_flux passed to CFE Set_value: %lf. "
+                "PET forcing must be finite and non-negative. Aborting...\n",
+                potential_et_m_per_s);
+
+            return BMI_FAILURE;
+        }
+    }
+
     memcpy (dest, src, nbytes);
 
     if (strcmp (name, "maxsmc") == 0 || strcmp (name, "alpha_fc") == 0 || strcmp (name, "wltsmc") == 0 || strcmp (name, "maxsmc") == 0 || strcmp (name, "b") == 0 || strcmp (name, "slope") == 0 || strcmp (name, "satpsi") == 0 || strcmp (name, "Klf") == 0  || strcmp (name, "satdk") == 0){
-
-        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-        init_soil_reservoir(cfe_ptr);
-    }
-    if (strcmp (name, "refkdt") == 0 || strcmp (name, "satdk") == 0){
-        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-        cfe_ptr->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = cfe_ptr->NWM_soil_params.refkdt * cfe_ptr->NWM_soil_params.satdk / 0.000002;
-
+        init_soil_reservoir((cfe_state_struct*) self->data);
     }
 
-    if (strcmp (name, "storage_max_m") == 0) {
-         cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
-         cfe_ptr->gw_reservoir.storage_m = cfe_ptr->gw_reservoir.gw_storage * cfe_ptr->gw_reservoir.storage_max_m;
-     }
-    
-    return BMI_SUCCESS;
+    return Set_value_at_indices(self, name, inds, 1, src);
 }
-
 
 static int Get_component_name (Bmi *self, char * name)
 {
