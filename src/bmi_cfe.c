@@ -999,7 +999,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
                     "Invalid CFE groundwater reservoir parameters from config. "
                     "gw_storage=%lf, max_gw_storage=%lf, Cgw=%lf, expon=%lf. "
                     "CFE cannot initialize groundwater reservoir with non-finite or physically invalid required values. "
-                    "Please check upstream parameter generation.\n",
+                    "Please check upstream parameter generation.",
                     model->gw_reservoir.gw_storage,
                     model->gw_reservoir.storage_max_m,
                     model->gw_reservoir.coeff_primary,
@@ -1010,7 +1010,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
             else if (gw_bad_param_warned == 1) {
                 Log(SEVERE,
                     "Invalid CFE groundwater reservoir parameters occurred again; "
-                    "further warnings suppressed.\n");
+                    "subsequent occurrences of this message will be suppressed.");
 
                 gw_bad_param_warned = 2;
             }

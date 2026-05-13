@@ -58,7 +58,7 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
         Log(WARNING,
             "Invalid CFE groundwater reservoir state or parameters during flux calculation; "
             "returning zero groundwater flux for this timestep. "
-            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf.\n",
+            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf.",
             da_reservoir->storage_m,
             da_reservoir->storage_max_m,
             da_reservoir->coeff_primary,
@@ -69,7 +69,7 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
       else if (gw_bad_state_warned == 1) {
         Log(WARNING,
             "Invalid CFE groundwater reservoir state or parameters occurred again; "
-            "further warnings suppressed.\n");
+            "subsequent occurrences of this message will be suppressed.");
 
         gw_bad_state_warned = 2;
       }
@@ -88,7 +88,7 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
         Log(WARNING,
             "Invalid CFE groundwater flux calculation; "
             "returning zero groundwater flux for this timestep. "
-            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf, raw_flux=%lf.\n",
+            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf, raw_flux=%lf.",
             da_reservoir->storage_m,
             da_reservoir->storage_max_m,
             da_reservoir->coeff_primary,
@@ -100,7 +100,7 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
       else if (gw_bad_flux_warned == 1) {
         Log(WARNING,
             "Invalid CFE groundwater flux calculation occurred again; "
-            "further warnings suppressed.\n");
+            "subsequent occurrences of this message will be suppressed.");
 
         gw_bad_flux_warned = 2;
       }
