@@ -2269,11 +2269,27 @@ static int Set_value_at_indices (Bmi *self, const char *name, int * inds, int le
     if (self->get_var_itemsize(self, name, &itemsize) == BMI_FAILURE)
         return BMI_FAILURE;
 
+    if (strcmp(name, "water_potential_evaporation_flux") == 0) {
+        for (size_t i=0; i<len; i++) {
+            double potential_et_m_per_s = *(((double*)src) + i);
+
+            if (!isfinite(potential_et_m_per_s) ||
+                potential_et_m_per_s < 0.0) {
+                Log(FATAL,
+                    "Invalid water_potential_evaporation_flux passed to CFE Set_value_at_indices: %lf. "
+                    "PET forcing must be finite and non-negative. Aborting...\n",
+                    potential_et_m_per_s);
+
+                return BMI_FAILURE;
+            }
+        }
+    }
+
     size_t i;
     size_t offset;
     char * ptr;
     // iterate over the source pointer, src, by itemsize byte chunks
-    // and set the destination pointer, dest, to the value in src 
+    // and set the destination pointer, dest, to the value in src
     // based on the linear offset provided by inds[i]
     for (i=0, ptr=(char*)src; i<len; i++, ptr+=itemsize) {
       offset = inds[i] * itemsize;
