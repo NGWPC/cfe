@@ -981,8 +981,6 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
     }
     
     // compute gw storage in meters
-    // compute gw storage in meters
-    // compute gw storage in meters
     if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
         if (!isfinite(model->gw_reservoir.gw_storage) ||
             !isfinite(model->gw_reservoir.storage_max_m) ||
@@ -2280,6 +2278,7 @@ static int Set_value_at_indices (Bmi *self, const char *name, int * inds, int le
 
 }
 
+
 static int Set_value (Bmi *self, const char *name, void *src)
 {
     // serialization
@@ -2313,10 +2312,22 @@ static int Set_value (Bmi *self, const char *name, void *src)
     memcpy (dest, src, nbytes);
 
     if (strcmp (name, "maxsmc") == 0 || strcmp (name, "alpha_fc") == 0 || strcmp (name, "wltsmc") == 0 || strcmp (name, "maxsmc") == 0 || strcmp (name, "b") == 0 || strcmp (name, "slope") == 0 || strcmp (name, "satpsi") == 0 || strcmp (name, "Klf") == 0  || strcmp (name, "satdk") == 0){
-        init_soil_reservoir((cfe_state_struct*) self->data);
+
+        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
+        init_soil_reservoir(cfe_ptr);
+    }
+    if (strcmp (name, "refkdt") == 0 || strcmp (name, "satdk") == 0){
+        cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
+        cfe_ptr->infiltration_excess_params_struct.Schaake_adjusted_magic_constant_by_soil_type = cfe_ptr->NWM_soil_params.refkdt * cfe_ptr->NWM_soil_params.satdk / 0.000002;
+
     }
 
-    return Set_value_at_indices(self, name, inds, 1, src);
+    if (strcmp (name, "storage_max_m") == 0) {
+         cfe_state_struct* cfe_ptr = (cfe_state_struct *) self->data;
+         cfe_ptr->gw_reservoir.storage_m = cfe_ptr->gw_reservoir.gw_storage * cfe_ptr->gw_reservoir.storage_max_m;
+     }
+    
+    return BMI_SUCCESS;
 }
 
 static int Get_component_name (Bmi *self, char * name)
