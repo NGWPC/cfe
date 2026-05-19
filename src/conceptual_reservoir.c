@@ -1,6 +1,7 @@
 #ifndef _CONCEPTUAL_RESERVOIR_C
 #define _CONCEPTUAL_RESERVOIR_C
 
+#include "logger.h"
 #include "conceptual_reservoir.h"
 
 
@@ -40,20 +41,80 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
   // *****************************************************************************
   // ------------------ Conceptual Ground Water Reservoir -------------------------
   // single outlet reservoir like the NWM V1.2 exponential conceptual gw reservoir
-  if (da_reservoir->is_exponential == TRUE) { 
+  if (da_reservoir->is_exponential == TRUE) {
+    static int gw_bad_state_warned = 0;
+
+    if (!isfinite(da_reservoir->storage_m) ||
+        !isfinite(da_reservoir->storage_max_m) ||
+        !isfinite(da_reservoir->coeff_primary) ||
+        !isfinite(da_reservoir->exponent_primary) ||
+        da_reservoir->storage_m <= 0.0 ||
+        da_reservoir->storage_max_m <= 0.0) {
+
+      if (gw_bad_state_warned == 0) {
+        Log(WARNING,
+            "Invalid CFE groundwater reservoir state or parameters during flux calculation; "
+            "returning zero groundwater flux for this timestep. "
+            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf.",
+            da_reservoir->storage_m,
+            da_reservoir->storage_max_m,
+            da_reservoir->coeff_primary,
+            da_reservoir->exponent_primary);
+
+        gw_bad_state_warned = 1;
+      }
+      else if (gw_bad_state_warned == 1) {
+        Log(WARNING,
+            "Invalid CFE groundwater reservoir state or parameters occurred again; "
+            "subsequent occurrences of this message will be suppressed.");
+
+        gw_bad_state_warned = 2;
+      }
+
+      return;
+    }
+
     // calculate the one flux and return.
     double exp_term = exp(da_reservoir->exponent_primary * da_reservoir->storage_m / da_reservoir->storage_max_m);
-    
-    *primary_flux_m = da_reservoir->coeff_primary * (exp_term - 1.0);
-    *secondary_flux_m = 0.0;
+    double calculated_flux_m = da_reservoir->coeff_primary * (exp_term - 1.0);
+
+    if (!isfinite(calculated_flux_m) || calculated_flux_m < 0.0) {
+      static int gw_bad_flux_warned = 0;
+
+      if (gw_bad_flux_warned == 0) {
+        Log(WARNING,
+            "Invalid CFE groundwater flux calculation; "
+            "returning zero groundwater flux for this timestep. "
+            "storage_m=%lf, storage_max_m=%lf, Cgw=%lf, expon=%lf, raw_flux=%lf.",
+            da_reservoir->storage_m,
+            da_reservoir->storage_max_m,
+            da_reservoir->coeff_primary,
+            da_reservoir->exponent_primary,
+            calculated_flux_m);
+
+        gw_bad_flux_warned = 1;
+      }
+      else if (gw_bad_flux_warned == 1) {
+        Log(WARNING,
+            "Invalid CFE groundwater flux calculation occurred again; "
+            "subsequent occurrences of this message will be suppressed.");
+
+        gw_bad_flux_warned = 2;
+      }
+
+      return;
+    }
+
+    *primary_flux_m = calculated_flux_m;
 
     // cap so flux never exceeds storage, but commented out here per OWP request (9/11/2025)
     //if (*primary_flux_m > da_reservoir->storage_m) {
     //    *primary_flux_m = da_reservoir->storage_m;
     //}
-    
+
     return;
   }
+
   // *****************************************************************************
   
   // code goes past here iff it is not a single outlet exponential deep groundwater reservoir of the NWM variety

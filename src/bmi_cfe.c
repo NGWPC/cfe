@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -975,13 +976,45 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
         return BMI_FAILURE;
     }
     if (is_gw_storage_set == FALSE) {
-        Log(SEVERE, "Config param 'gw_storage' not found in config file. Aborting...n");
+	Log(SEVERE, "Config param 'gw_storage' not found in config file. Aborting...\n");
         return BMI_FAILURE;
     }
     
-    // compute gw storage in meters	
+    // compute gw storage in meters
     if ((is_gw_storage_set == TRUE) && (is_gw_max_set == TRUE)) {
-        model->gw_reservoir.storage_m = model->gw_reservoir.gw_storage * model->gw_reservoir.storage_max_m;
+        if (!isfinite(model->gw_reservoir.gw_storage) ||
+            !isfinite(model->gw_reservoir.storage_max_m) ||
+            !isfinite(model->gw_reservoir.coeff_primary) ||
+            !isfinite(model->gw_reservoir.exponent_primary) ||
+            model->gw_reservoir.gw_storage < 0.0 ||
+            model->gw_reservoir.storage_max_m <= 0.0) {
+
+            static int gw_bad_param_warned = 0;
+
+            if (gw_bad_param_warned == 0) {
+                Log(WARNING,
+                    "Invalid CFE groundwater reservoir parameters from config. "
+                    "gw_storage=%lf, max_gw_storage=%lf, Cgw=%lf, expon=%lf. "
+                    "This indicates an upstream parameter-generation issue that should be corrected.\n",
+                    model->gw_reservoir.gw_storage,
+                    model->gw_reservoir.storage_max_m,
+                    model->gw_reservoir.coeff_primary,
+                    model->gw_reservoir.exponent_primary);
+
+                gw_bad_param_warned = 1;
+            }
+            else if (gw_bad_param_warned == 1) {
+                Log(WARNING,
+                    "Invalid CFE groundwater reservoir parameters occurred again; "
+                    "subsequent occurrences of this message will be suppressed.\n");
+
+                gw_bad_param_warned = 2;
+            }
+        }
+
+        model->gw_reservoir.storage_m =
+            model->gw_reservoir.gw_storage *
+            model->gw_reservoir.storage_max_m;
     }
 
     if (is_num_timesteps_set == FALSE && strcmp(model->forcing_file, "BMI")) {
@@ -2296,7 +2329,6 @@ static int Set_value (Bmi *self, const char *name, void *src)
     
     return BMI_SUCCESS;
 }
-
 
 static int Get_component_name (Bmi *self, char * name)
 {
