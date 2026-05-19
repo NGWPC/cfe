@@ -90,7 +90,7 @@ extern void cfe(
     else if (potentialEtIssueWarned == 1) {
       Log(WARNING,
           "Invalid CFE potential ET input occurred again; "
-          "further warnings suppressed.\n");
+          "subsequent occurrences of this message will be suppressed.\n");
 
       potentialEtIssueWarned = 2;
     }
