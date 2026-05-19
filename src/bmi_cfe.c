@@ -1244,7 +1244,7 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 static int Initialize (Bmi *self, const char *file)
 {
     // Initialize the Error, Warning and Trapping System
-	#ifdef EWTS_HAVE_NGEN_BRIDGE    
+	#ifdef USE_EWTS    
 	    EwtsInit(EWTS_ID_CFE, true);
 	#else
 	    EwtsInit(EWTS_ID_CFE, false);
