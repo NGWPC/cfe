@@ -42,9 +42,6 @@ extern void conceptual_reservoir_flux_calc(struct conceptual_reservoir *da_reser
   // ------------------ Conceptual Ground Water Reservoir -------------------------
   // single outlet reservoir like the NWM V1.2 exponential conceptual gw reservoir
   if (da_reservoir->is_exponential == TRUE) {
-    *primary_flux_m = 0.0;
-    *secondary_flux_m = 0.0;
-
     static int gw_bad_state_warned = 0;
 
     if (!isfinite(da_reservoir->storage_m) ||

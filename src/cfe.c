@@ -72,6 +72,29 @@ extern void cfe(
   //##################################################
   // partition rainfall using Schaake function
   //##################################################
+  static int potentialEtIssueWarned = 0;
+
+  if (!isfinite(evap_struct->potential_et_m_per_s) ||
+      evap_struct->potential_et_m_per_s < 0.0) {
+
+    if (potentialEtIssueWarned == 0) {
+      Log(WARNING,
+          "Invalid CFE potential ET input detected. "
+          "water_potential_evaporation_flux=%lf, time_step_size=%lf. "
+          "This indicates an upstream forcing/BMI provider issue.\n",
+          evap_struct->potential_et_m_per_s,
+          time_step_size);
+
+      potentialEtIssueWarned = 1;
+    }
+    else if (potentialEtIssueWarned == 1) {
+      Log(WARNING,
+          "Invalid CFE potential ET input occurred again; "
+          "further warnings suppressed.\n");
+
+      potentialEtIssueWarned = 2;
+    }
+  }
   evap_struct->potential_et_m_per_timestep = evap_struct->potential_et_m_per_s * time_step_size;
   evap_struct->reduced_potential_et_m_per_timestep = evap_struct->potential_et_m_per_s * time_step_size;
  
