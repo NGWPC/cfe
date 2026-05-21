@@ -1244,11 +1244,12 @@ int read_init_config_cfe(const char* config_file, cfe_state_struct* model)
 static int Initialize (Bmi *self, const char *file)
 {
     // Initialize the Error, Warning and Trapping System
-	#ifdef USE_EWTS    
-	    EwtsInit(EWTS_ID_CFE, true);
-	#else
-	    EwtsInit(EWTS_ID_CFE, false);
-	#endif  
+#ifdef CFE_USE_EWTS    
+    #pragma message("cfe.bmi_cfe.Initialize: CFE_USE_EWTS ON")
+    EwtsInit(CFE_MODULE_ID, true);
+#else
+    #pragma message("cfe.bmi_cfe.Initialize: CFE_USE_EWTS OFF")
+#endif  
 
     // setup the logger
     Log(INFO, "In CFE Initialize()\n");     
