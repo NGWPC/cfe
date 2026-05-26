@@ -116,9 +116,12 @@ int free_serialized_cfe(Bmi* bmi) {
     return BMI_SUCCESS;
 }
 
-int load_serialized_cfe(Bmi* bmi, const char* data) {
+int load_serialized_cfe(Bmi* bmi, char* data) {
     CfeSerializer serializer(bmi);
-    std::istringstream stream(data);
+    // get size of data from header
+    uint64_t size;
+    memcpy(&size, data, sizeof(uint64_t));
+    membuf stream(data + sizeof(uint64_t), size);
     boost::archive::binary_iarchive archive(stream);
     try {
         archive >> serializer;
@@ -146,7 +149,8 @@ int new_serialized_cfe(Bmi* bmi) {
         free(model->serialized);
     }
     // set size and allocate memory
-    model->serialized_length = stream.size();
+    uint64_t serialized_size = stream.size();
+    model->serialized_length = sizeof(uint64_t) + serialized_size;
     model->serialized = (char*)malloc(model->serialized_length);
     // make sure memory could be allocated
     if (model->serialized == NULL) {
@@ -155,7 +159,8 @@ int new_serialized_cfe(Bmi* bmi) {
         return BMI_FAILURE;
     }
     // copy stream data to new allocation
-    memcpy(model->serialized, stream.data(), model->serialized_length);
+    memcpy(model->serialized, &serialized_size, sizeof(uint64_t));
+    memcpy(model->serialized + sizeof(uint64_t), stream.data(), serialized_size);
     return BMI_SUCCESS;
 }
 

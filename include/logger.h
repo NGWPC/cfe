@@ -1,21 +1,13 @@
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef CFE_LOGGER_H
+#define CFE_LOGGER_H
 
-#include <stdarg.h> // for variable args: va_list
-#include <stdbool.h>
+#include "ewts/module_constants.h"
+#include "ewts/logger.h"
+#include "ewts/log_levels.h"
 
-typedef enum {      
-    NONE = 0,
-    DEBUG = 1,
-    INFO = 2,
-    WARNING = 3,
-    SEVERE = 4,
-    FATAL = 5,
-} LogLevel;
+#define Log(level, ...) EwtsLogModule(EWTS_ID_CFE, (level), __VA_ARGS__)
+#define LOG(level, ...) EwtsLogModule(EWTS_ID_CFE, (level), __VA_ARGS__)
+#define GetLogLevel() EwtsGetLogLevelModule(EWTS_ID_CFE)
+#define IsLoggingEnabled() EwtsIsLoggingEnabledModule(EWTS_ID_CFE)
 
-// Public Methods
-void Log(LogLevel messageLevel, const char* message, ...);
-bool IsLoggingEnabled(void);
-LogLevel GetLogLevel(void);
-
-#endif // LOGGER_H
+#endif // CFE_LOGGER_H
