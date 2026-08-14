@@ -97,6 +97,15 @@ void CfeSerializer::serialize(Archive& ar, const unsigned int version) {
         ar & make_array(state->runoff_queue_m_per_timestep, // giuh_convolution_integral
                         state->num_giuh_ordinates + 1); // config
     } 
+
+    // BMI output vars
+    ar & state->infiltration_excess_params_struct.surface_water_partitioning_scheme;
+    ar & state->aorc.precip_kg_per_m2;
+    ar & state->sfcrnoff_accum_m;
+    ar & state->catchment_area_m2;
+    ar & state->time_step_size;
+    ar & state->flux_from_deep_gw_to_chan_m3_per_s;
+
     /// state->nash_surface_params.runon_infiltration not used for input or GetValue
     // else if (state->surface_runoff_scheme == NASH_CASCADE) {
     //     ar & state->nash_surface_params.runon_infiltration;
